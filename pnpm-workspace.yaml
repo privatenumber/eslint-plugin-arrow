@@ -1,6 +1,9 @@
 allowBuilds:
   esbuild: false
   unrs-resolver: false
+skills:
+  dirs:
+    - .agents/skills
 permissions:
   clean-pkg-json:
     skills: true

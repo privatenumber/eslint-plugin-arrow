@@ -1,0 +1,9 @@
+{
+	"jsPlugins": [
+		"eslint-plugin-arrow"
+	],
+	"rules": {
+		"arrow/prefer-arrow-functions": "error",
+		"arrow/no-function-hoisting": "error"
+	}
+}

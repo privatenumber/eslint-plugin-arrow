@@ -32,10 +32,11 @@ Each result in a comment was observed on 2026-11-10:
 
 - Runtime results: Node.js v26.13.0 with `node --input-type=module -e '<snippet>'`. The redeclaration example sits inside a function body, because two top-level function declarations with the same name are a `SyntaxError` in a module.
 - TypeScript diagnostics: TypeScript 6.0.3 with `strict: true`, from `ts.getPreEmitDiagnostics` on an in-memory file for each row: TS2730 for a `this` parameter, TS2775 and TS18048 for an assertion arrow function, TS2322 after a call to a `never` arrow function, and TS2451 for a `const` merged with a `namespace` that exports a value. An empty `namespace` merges with a `const` without an error, so the README example exports a value. With an explicit function type on the variable, such as `const fail: () => never = ...`, assertion and `never` arrow functions narrow like declarations, so the README describes these as breaking in a direct conversion, not as declaration-only features.
+- Declaration output: the README's `.d.ts` example matches `ts.transpileDeclaration` output, as in [../typescript/declaration-emit.md](../typescript/declaration-emit.md).
 
-The README does not claim that a conversion keeps a function's type. Only written annotations are kept, and TypeScript 6.0.3 types the two forms differently in these cases, which the rule doc's "Code the rule cannot check" section lists:
+The README and rule doc claim only that the fixes keep written type annotations, not a function's type, and TypeScript 6.0.3 types the two forms differently in these cases, which the rule doc's "Code the rule cannot check" section lists:
 
 - `export function f(n: number) { if (n) return f(n - 1); return 1 }` type-checks. As `export const f = (n: number) => ...`, it reports TS7023.
 - `export function f() { throw Error() }` emits `export declare function f(): void;`. As an arrow function, it emits `export declare const f: () => never;`.
 - With `lib.ts` exporting `function f() {}` and `aug.ts` containing `declare module './lib' { namespace f { let extra: number } }`, `tsc` passes. After conversion to `const`, it reports TS2451 and TS2339.
-- With `checkJs`, `/** @this {Window} */ export function f() {}` type-checks, and `/** @this {Window} */ export const f = () => {}` reports TS2730. The rule does not read JSDoc tags. The `.d.ts` example matches `ts.transpileDeclaration` output, as in [../typescript/declaration-emit.md](../typescript/declaration-emit.md).
+- With `checkJs`, `/** @this {Window} */ export function f() {}` type-checks, and `/** @this {Window} */ export const f = () => {}` reports TS2730.

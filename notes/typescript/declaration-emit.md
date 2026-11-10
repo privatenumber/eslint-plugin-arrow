@@ -1,6 +1,6 @@
 # Declaration emit for exported functions
 
-Converting `export function parse() {}` to `export const parse = () => {}` changes a library's `.d.ts` output from a function declaration to a constant with a function type. The parameter types, return type, type parameters, and JSDoc stay the same, so consumers get the same types. Only the form changes: editors show `const parse` instead of `function parse`.
+Converting `export function parse() {}` to `export const parse = () => {}` changes a library's `.d.ts` output from a function declaration to a constant with a function type. For a fully annotated function, the parameter types, return type, type parameters, and JSDoc stay the same, so consumers get the same types. Only the form changes: editors show `const parse` instead of `function parse`. Inferred return types and augmentations in other files can still change; [../eslint-plugin-arrow/docs-examples.md](../eslint-plugin-arrow/docs-examples.md#readme-teaching-examples) lists the observed cases.
 
 Last verified: 2026-10-31, TypeScript 6.0.3.
 

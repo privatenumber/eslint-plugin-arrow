@@ -1,6 +1,6 @@
 # eslint-plugin-arrow
 
-[ESLint](https://eslint.org) and [Oxlint](https://oxc.rs/docs/guide/usage/linter) rules for JavaScript and TypeScript that convert `function` to arrow functions, and move declarations before their first use. A function is only converted when the arrow function behaves the same, and the autofixes keep your comments, formatting, and types.
+[ESLint](https://eslint.org) and [Oxlint](https://oxc.rs/docs/guide/usage/linter) rules for JavaScript and TypeScript that convert `function` to arrow functions, and move declarations before their first use. A function is only converted when the arrow function behaves the same, and the autofixes keep your comments, formatting, and type annotations.
 
 <!-- eslint-disable pvtnbr/no-function-hoisting, pvtnbr/prefer-arrow-functions, prefer-arrow-callback -->
 ```ts
@@ -134,7 +134,7 @@ export declare const parse: (input: string) => number
 | `never` return type | `function fail(): never { throw error }` | Code after the call is no longer unreachable, so the type isn't narrowed |
 | Namespace merging | `function f() {}` with `namespace f { export const x = 1 }` | TS2451: Cannot redeclare block-scoped variable |
 
-The rule only sees the current file and the written types. The [rule's TypeScript limitations](./docs/rules/prefer-arrow-functions.md#typescript-1) list the other cases it keeps, and [Code the rule cannot check](./docs/rules/prefer-arrow-functions.md#code-the-rule-cannot-check) lists type changes it can miss, such as inferred return types.
+The rule only sees the current file and the written types. Its [limitations](./docs/rules/prefer-arrow-functions.md#limitations) list every case it keeps, and [Code the rule cannot check](./docs/rules/prefer-arrow-functions.md#code-the-rule-cannot-check) lists type changes it can miss, such as inferred return types.
 
 ## Install
 

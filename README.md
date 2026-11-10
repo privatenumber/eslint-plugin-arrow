@@ -102,7 +102,7 @@ So default to arrow functions, and reserve `function` for code that actually nee
 
 ## What about TypeScript?
 
-In TypeScript files, the fixes keep every type annotation, so the converted function has the same signature. A few things still differ.
+The fixes keep type annotations as written. But a function declaration and a `const` arrow function are still different to TypeScript.
 
 **An arrow function can take its type from a variable annotation.** A function type annotation types all the parameters and the return value at once. A function declaration can't have this annotation, so you type each parameter on its own:
 
@@ -113,7 +113,7 @@ type Handler = (event: MouseEvent) => void
 const onClick: Handler = (event) => {}
 ```
 
-**Declaration files show a `const`.** An exported function in a `.ts` file becomes a constant with a function type in the `.d.ts` output. The parameter types, return type, type parameters, and JSDoc stay the same, so calls to the function type-check the same way:
+**Declaration files show a `const`.** An exported function in a `.ts` file becomes a constant with a function type in the `.d.ts` output. Annotated parameter types, return types, and type parameters keep the same text:
 
 <!-- eslint-skip -->
 ```ts
@@ -134,7 +134,7 @@ export declare const parse: (input: string) => number
 | `never` return type | `function fail(): never { throw error }` | Code after the call is no longer unreachable, so the type isn't narrowed |
 | Namespace merging | `function f() {}` with `namespace f { export const x = 1 }` | TS2451: Cannot redeclare block-scoped variable |
 
-The [rule's TypeScript limitations](./docs/rules/prefer-arrow-functions.md#typescript-1) list the other cases it keeps.
+The rule only sees the current file and the written types. The [rule's TypeScript limitations](./docs/rules/prefer-arrow-functions.md#typescript-1) list the other cases it keeps, and [Code the rule cannot check](./docs/rules/prefer-arrow-functions.md#code-the-rule-cannot-check) lists type changes it can miss, such as inferred return types.
 
 ## Install
 

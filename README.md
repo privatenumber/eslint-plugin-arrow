@@ -142,6 +142,16 @@ function b() {}
 b = 5 // No error
 ```
 
+**It can't take a function type.** In TypeScript, you can't annotate a function declaration with a reusable function type. So you repeat its types by hand, and the declaration itself isn't checked against that type:
+
+<!-- eslint-skip -->
+```ts
+type Handler = (event: MouseEvent) => void
+
+// Repeats Handler's types, but nothing ties it to Handler
+function onClick(event: MouseEvent): void {}
+```
+
 <details>
 <summary><strong>And all of this is just in "strict mode".</strong> Sloppy mode adds even more footguns.</summary>
 
@@ -159,7 +169,7 @@ ES modules and class bodies are always strict. But CommonJS files and classic `<
 
 ### Enter arrow functions
 
-Arrow functions solves all of it. An arrow function in a `const` does one thing: it runs its body when you call it. The error messages below are from Node.js:
+Arrow functions solve all of it. An arrow function in a `const` does one thing: it runs its body when you call it. The error messages below are from Node.js:
 
 | `function` | `const` arrow function |
 | --- | --- |
@@ -168,6 +178,7 @@ Arrow functions solves all of it. An arrow function in a `const` does one thing:
 | Has its own `arguments` | Uses the `arguments` of the enclosing `function`, if there is one |
 | Works with `new` | Throws `greet is not a constructor` |
 | Can be silently replaced | Assignment throws `Assignment to constant variable`, and a second declaration is a syntax error |
+| Can't take a function type | `const onClick: Handler = (event) => {}` types `event` from `Handler` |
 
 This holds in both strict and sloppy mode: an arrow function never has its own `this` or `arguments`, and never allows repeated parameter names.
 
@@ -175,33 +186,9 @@ This is the same move ES6 made for variables. We started preferring `const` over
 
 So default to arrow functions, and keep `function` for code that needs what it adds. Then, just as `let` signals "this will be reassigned," `function` signals "something specific is going on here."
 
-### What about TypeScript?
+### When you still need `function`
 
-TypeScript treats the two forms differently too. Some differences favor arrow functions, and some favor declarations.
-
-**An arrow function can reuse a function type.** Both forms can annotate parameters inline, like `(a: number): number => a`. But only a `const` can take a whole function type, which then types every parameter and the return value:
-
-```ts
-type Handler = (event: MouseEvent) => void
-
-// `event` is a MouseEvent, without an inline annotation
-const onClick: Handler = (event) => {}
-```
-
-A function declaration has no place for `: Handler`, so it repeats each type inline.
-
-**Declaration files show a `const`.** An exported `const` arrow function appears in `.d.ts` output as a constant with a function type. For the same written signature, only the form differs:
-
-<!-- eslint-skip -->
-```ts
-// From a function declaration
-export declare function parse(input: string): number
-
-// From a const arrow function
-export declare const parse: (input: string) => number
-```
-
-**Some features need a function declaration, or extra types on a `const`:**
+Some TypeScript features only work on a function declaration, or need extra types on a `const`:
 
 | Feature | Example | As a `const` arrow function |
 | --- | --- | --- |
@@ -212,6 +199,8 @@ export declare const parse: (input: string) => number
 | Namespace merging | `function f() {}` with `namespace f { export const x = 1 }` | Not supported (TS2451) |
 
 `prefer-arrow-functions` keeps these functions as `function`, because its autofix doesn't add type annotations. It also only sees the current file and the types written in it. Its [limitations](./docs/rules/prefer-arrow-functions.md#limitations) list the cases it keeps, and [Code the rule cannot check](./docs/rules/prefer-arrow-functions.md#code-the-rule-cannot-check) lists type changes it can miss, such as inferred return types.
+
+**Published types change form.** An exported `const` arrow function appears in `.d.ts` output as `declare const parse: (input: string) => number` instead of `declare function parse(input: string): number`.
 
 ## Rules
 

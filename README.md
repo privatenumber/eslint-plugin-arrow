@@ -179,14 +179,16 @@ So default to arrow functions, and keep `function` for code that needs what it a
 
 TypeScript treats the two forms differently too. Some differences favor arrow functions, and some favor declarations.
 
-**An arrow function can take its type from a variable annotation.** A function type annotation types all the parameters and the return value at once. A function declaration can't have this annotation, so you type each parameter on its own:
+**An arrow function can reuse a function type.** Both forms can annotate parameters inline, like `(a: number): number => a`. But only a `const` can take a whole function type, which then types every parameter and the return value:
 
 ```ts
 type Handler = (event: MouseEvent) => void
 
-// `event` is a MouseEvent
+// `event` is a MouseEvent, without an inline annotation
 const onClick: Handler = (event) => {}
 ```
+
+A function declaration has no place for `: Handler`, so it repeats each type inline.
 
 **Declaration files show a `const`.** An exported `const` arrow function appears in `.d.ts` output as a constant with a function type. For the same written signature, only the form differs:
 

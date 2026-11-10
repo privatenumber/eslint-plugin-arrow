@@ -33,7 +33,8 @@ npm install -D eslint-plugin-arrow
 
 Requires Node.js 22 or later, and ESLint 9 or later or Oxlint.
 
-### ESLint
+<details>
+<summary><strong>ESLint</strong></summary>
 
 ```js
 // eslint.config.js
@@ -46,7 +47,10 @@ export default [
 
 The recommended config enables both rules with their default options. Each rule's docs describe its options.
 
-### Oxlint
+</details>
+
+<details>
+<summary><strong>Oxlint</strong></summary>
 
 Oxlint runs the same plugin through [JS plugins](https://oxc.rs/docs/guide/usage/linter/js-plugins). Extend the plugin's recommended config in `oxlint.config.ts`:
 
@@ -70,13 +74,14 @@ export default defineConfig({
 }
 ```
 
-> [!WARNING]
-> Oxlint [describes JS plugins as alpha](https://oxc.rs/docs/guide/usage/linter/js-plugins), so their behavior can change between Oxlint releases.
+**Warning:** Oxlint [describes JS plugins as alpha](https://oxc.rs/docs/guide/usage/linter/js-plugins), so their behavior can change between Oxlint releases.
 
 Oxlint differs from ESLint in two ways:
 
 - `oxlint --fix` applies one pass of fixes per run, while `eslint --fix` repeats until nothing changes. If a function needs to be both moved and converted, run `oxlint --fix` again to apply the remaining fix.
 - Oxlint has no `sourceType` setting. It parses a `.js` file without `import` or `export` as a classic script, even in a CommonJS package, and in a classic script a top-level function declaration is a global variable. So `prefer-arrow-functions` keeps top-level function declarations in those files. Use the `.cjs` extension to have them converted.
+
+</details>
 
 ## Did you know?
 

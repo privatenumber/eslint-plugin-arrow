@@ -96,7 +96,7 @@ b = 5 // No error
 
 `prefer-arrow-functions` keeps functions that depend on the last three, as its [limitations](./docs/rules/prefer-arrow-functions.md#limitations) describe.
 
-## Enter arrow functions
+### Enter arrow functions
 
 Arrow functions drop all of it. An arrow function in a `const` does one thing: it runs its body when you call it. The error messages below are from Node.js:
 
@@ -114,7 +114,7 @@ This is the same move ES6 made for variables. We started preferring `const` over
 
 So default to arrow functions, and keep `function` for code that needs what it adds. Then, just as `let` signals "this will be reassigned," `function` signals "something specific is going on here."
 
-## What about TypeScript?
+### What about TypeScript?
 
 The fixes keep type annotations as written. But a function declaration and a `const` arrow function are still different to TypeScript.
 

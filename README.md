@@ -37,7 +37,7 @@ greet() // Works
 function greet() {}
 ```
 
-**Its `this` depends on how you call it.** Store a method in a variable, and the method loses its object. In an ES module or other strict code:
+**Its `this` depends on how you call it.** `call`, `apply`, and `bind` can set `this` to any value. Store a method in a variable, and the method loses its object:
 
 <!-- eslint-skip -->
 ```js
@@ -66,6 +66,8 @@ new greet() // greet {}
 greet.prototype // {}
 ```
 
+`Reflect.construct()`, `instanceof`, and `class extends` depend on this too.
+
 **It can be replaced.** You can assign a new value to a function declaration. Inside a function body, a second declaration with the same name also replaces the first, with no error:
 
 <!-- eslint-skip -->
@@ -80,25 +82,35 @@ function b() {}
 b = 5 // No error
 ```
 
-An arrow function stored in a `const` has none of this behavior. The error messages below are from Node.js:
+**And all of this assumes strict mode.** ES modules and class bodies are always strict. But CommonJS files without `'use strict'` and classic `<script>`s run in sloppy mode, where `function` has even more footguns:
 
-| Behavior | `const` arrow function |
+- **`this` becomes `globalThis`.** The detached `get()` above doesn't throw. It silently reads `globalThis.count`. A primitive passed as `this` is wrapped in an object, so `f.call(1)` sees `typeof this === 'object'`.
+- **`arguments` is linked to the parameters.** In `function f(x) { arguments[0] = 9; return x }`, the call `f(1)` returns `9`.
+- **A function can see its caller.** `f.caller` is the function that called `f`, and `arguments.callee` is `f` itself.
+- **Assigning to a named function expression's own name fails silently.** Inside `(function f() { f = 1 })`, `f` is still the function after the assignment. Strict mode throws.
+- **Parameter names can repeat**, as in `function f(a, a) {}`.
+- **Declarations in a block are visible outside the block.**
+- **Top-level declarations in a classic script become globals**, such as `window.f`.
+
+`prefer-arrow-functions` keeps functions that depend on the last three, as its [limitations](./docs/rules/prefer-arrow-functions.md#limitations) describe.
+
+## Enter arrow functions
+
+Arrow functions drop all of it. An arrow function in a `const` does one thing: it runs its body when you call it. The error messages below are from Node.js:
+
+| `function` | `const` arrow function |
 | --- | --- |
-| Use before definition | Throws `Cannot access 'greet' before initialization` |
-| `this` | Uses the `this` of the code around it |
-| `arguments` | Uses the `arguments` of the enclosing `function`, if there is one |
-| `new` | Throws `greet is not a constructor` |
-| Replacement | Assignment throws `Assignment to constant variable`, and a second declaration is a syntax error |
+| Runs before its definition | Throws `Cannot access 'greet' before initialization` |
+| `this` depends on the caller | `this` comes from the code around it, and `call`, `apply`, and `bind` can't change it |
+| Has its own `arguments` | Uses the `arguments` of the enclosing `function`, if there is one |
+| Works with `new` | Throws `greet is not a constructor` |
+| Can be silently replaced | Assignment throws `Assignment to constant variable`, and a second declaration is a syntax error |
 
-Sloppy mode and classic scripts add a few more differences. The [`prefer-arrow-functions` limitations](./docs/rules/prefer-arrow-functions.md#limitations) list them.
+This holds in both strict and sloppy mode: an arrow function never has its own `this` or `arguments`, and never allows repeated parameter names.
 
-## Why?
+This is the same move ES6 made for variables. We started preferring `const` over `let`, and `let` over `var`, because narrower syntax tells the reader what *can't* happen. Functions got left behind.
 
-In ES6, we started preferring `const` over `let`, and `let` over `var`. Narrower syntax signals to the reader what *can't* happen, so there's less to keep in mind. A `const`, for example, will never be reassigned, and can't be used before it's declared.
-
-But functions got left behind. `function` is still the default, even though it carries all the behavior above. Arrow functions are the narrower option.
-
-So default to arrow functions, and reserve `function` for code that actually needs that behavior. Then, just as `let` signals "this will be reassigned," `function` becomes a signal too: "something specific is going on here."
+So default to arrow functions, and keep `function` for code that needs what it adds. Then, just as `let` signals "this will be reassigned," `function` signals "something specific is going on here."
 
 ## What about TypeScript?
 

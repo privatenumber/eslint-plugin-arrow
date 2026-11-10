@@ -37,6 +37,8 @@ greet() // Works
 function greet() {}
 ```
 
+In two lines, that looks harmless. In a long file, it means you can't read the code from top to bottom. A call near the top can depend on a function defined hundreds of lines below, and that function can call another one defined somewhere in between. To follow the code, you jump down to each definition and back up to where you left off.
+
 **Its `this` depends on how you call it.** `call`, `apply`, and `bind` can set `this` to any value. Store a method in a variable, and the method loses its object:
 
 <!-- eslint-skip -->
@@ -100,7 +102,7 @@ Arrow functions drop all of it. An arrow function in a `const` does one thing: i
 
 | `function` | `const` arrow function |
 | --- | --- |
-| Runs before its definition | Throws `Cannot access 'greet' before initialization` |
+| Runs before its definition | Must be defined before it's called, so the file reads from top to bottom. Calling it early throws `Cannot access 'greet' before initialization`. |
 | `this` depends on the caller | `this` comes from the code around it, and `call`, `apply`, and `bind` can't change it |
 | Has its own `arguments` | Uses the `arguments` of the enclosing `function`, if there is one |
 | Works with `new` | Throws `greet is not a constructor` |

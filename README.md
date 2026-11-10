@@ -37,7 +37,7 @@ greet() // Works
 function greet() {}
 ```
 
-**Its `this` depends on how you call it.** Store a method in a variable, and the method loses its object:
+**Its `this` depends on how you call it.** Store a method in a variable, and the method loses its object. In an ES module or other strict code:
 
 <!-- eslint-skip -->
 ```js
@@ -57,7 +57,7 @@ function sum() { return arguments.length }
 sum(1, 2, 3) // 3
 ```
 
-**It's also a constructor.** You can call any `function` with `new`, and it has a `prototype` object:
+**It's also a constructor.** You can call a `function` that isn't async or a generator with `new`, and it has a `prototype` object:
 
 <!-- eslint-skip -->
 ```js
@@ -80,13 +80,13 @@ function b() {}
 b = 5 // No error
 ```
 
-An arrow function stored in a `const` has none of this behavior:
+An arrow function stored in a `const` has none of this behavior. The error messages below are from Node.js:
 
 | Behavior | `const` arrow function |
 | --- | --- |
 | Use before definition | Throws `Cannot access 'greet' before initialization` |
 | `this` | Uses the `this` of the code around it |
-| `arguments` | Uses the `arguments` of the code around it |
+| `arguments` | Uses the `arguments` of the enclosing `function`, if there is one |
 | `new` | Throws `greet is not a constructor` |
 | Replacement | Assignment throws `Assignment to constant variable`, and a second declaration is a syntax error |
 
@@ -102,7 +102,7 @@ So default to arrow functions, and reserve `function` for code that actually nee
 
 ## What about TypeScript?
 
-The fixes keep every type annotation, so the converted function has the same type. A few things still differ.
+In TypeScript files, the fixes keep every type annotation, so the converted function has the same signature. A few things still differ.
 
 **An arrow function can take its type from a variable annotation.** A function type annotation types all the parameters and the return value at once. A function declaration can't have this annotation, so you type each parameter on its own:
 
@@ -113,7 +113,7 @@ type Handler = (event: MouseEvent) => void
 const onClick: Handler = (event) => {}
 ```
 
-**Declaration files show a `const`.** An exported function becomes a constant with a function type in the `.d.ts` output. The parameter types, return type, type parameters, and JSDoc stay the same, so code that uses the function gets the same types:
+**Declaration files show a `const`.** An exported function in a `.ts` file becomes a constant with a function type in the `.d.ts` output. The parameter types, return type, type parameters, and JSDoc stay the same, so calls to the function type-check the same way:
 
 <!-- eslint-skip -->
 ```ts
@@ -124,15 +124,15 @@ export declare function parse(input: string): number
 export declare const parse: (input: string) => number
 ```
 
-**Some TypeScript features only work on function declarations.** `prefer-arrow-functions` keeps these functions as `function`:
+**Some TypeScript features break in a direct conversion.** A `const` arrow function supports some of them only when the variable has an explicit function type, and the fix doesn't write that type for you. So `prefer-arrow-functions` keeps these functions as `function`:
 
-| Feature | Example | As a `const` arrow function |
+| Feature | Example | After a direct conversion |
 | --- | --- | --- |
-| Overloads | `function f(v: string): string` | `const` has no overload syntax |
+| Overloads | `function f(v: string): string` | `const` has no overload syntax. It needs an overloaded function type instead. |
 | `this` parameter | `function f(this: Window) {}` | TS2730: An arrow function cannot have a 'this' parameter |
 | Assertion function | `function assert(v: unknown): asserts v {}` | TS2775, and the call no longer narrows the type |
 | `never` return type | `function fail(): never { throw error }` | Code after the call is no longer unreachable, so the type isn't narrowed |
-| Namespace merging | `function f() {}` with `namespace f {}` | TS2451: Cannot redeclare block-scoped variable |
+| Namespace merging | `function f() {}` with `namespace f { export const x = 1 }` | TS2451: Cannot redeclare block-scoped variable |
 
 The [rule's TypeScript limitations](./docs/rules/prefer-arrow-functions.md#typescript-1) list the other cases it keeps.
 

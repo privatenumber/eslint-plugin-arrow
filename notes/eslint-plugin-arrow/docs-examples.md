@@ -26,9 +26,11 @@ The test found two errors when it was added: the `export default` split added a 
 
 ## README teaching examples
 
-The README's "Did you know?" and "What about TypeScript?" sections explain what `function` adds before the README introduces the rules. Their snippets use `<!-- eslint-skip -->` and no `// ❌` or `// ✅` label, because they show language behavior, not rule output, so the docs test does not check them.
+The README's "Did you know?" and "What about TypeScript?" sections explain what `function` adds before the README introduces the rules. Their snippets have no `// ❌` or `// ✅` label, because they show language behavior, not rule output, so the docs test does not check them. Snippets that the docs lint would report use `<!-- eslint-skip -->`.
 
 Each result in a comment was observed on 2026-11-10:
 
 - Runtime results: Node.js v26.13.0 with `node --input-type=module -e '<snippet>'`. The redeclaration example sits inside a function body, because two top-level function declarations with the same name are a `SyntaxError` in a module.
-- TypeScript diagnostics: TypeScript 6.0.3 with `strict: true`, from `ts.getPreEmitDiagnostics` on an in-memory file for each row: TS2730 for a `this` parameter, TS2775 and TS18048 for an assertion arrow function, TS2322 after a call to a `never` arrow function, and TS2451 for a `const` merged with a `namespace`. The `.d.ts` example matches `ts.transpileDeclaration` output, as in [../typescript/declaration-emit.md](../typescript/declaration-emit.md).
+- TypeScript diagnostics: TypeScript 6.0.3 with `strict: true`, from `ts.getPreEmitDiagnostics` on an in-memory file for each row: TS2730 for a `this` parameter, TS2775 and TS18048 for an assertion arrow function, TS2322 after a call to a `never` arrow function, and TS2451 for a `const` merged with a `namespace` that exports a value. An empty `namespace` merges with a `const` without an error, so the README example exports a value. With an explicit function type on the variable, such as `const fail: () => never = ...`, assertion and `never` arrow functions narrow like declarations, so the README describes these as breaking in a direct conversion, not as declaration-only features.
+
+The type-preservation claims cover TypeScript files only. For checked JavaScript (`allowJs` and `checkJs`), a converted function keeps its JSDoc comment. TypeScript 6.0.3 accepts `/** @this {Window} */ export function f() {}` but reports TS2730 on `/** @this {Window} */ export const f = () => {}`, and `prefer-arrow-functions` does not read JSDoc tags. The `.d.ts` example matches `ts.transpileDeclaration` output, as in [../typescript/declaration-emit.md](../typescript/declaration-emit.md).

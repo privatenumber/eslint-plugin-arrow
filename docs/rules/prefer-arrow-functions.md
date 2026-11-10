@@ -9,6 +9,8 @@ Arrow functions are more concise and have fewer features compared to regular fun
 
 When you encounter an arrow function, you can quickly assume it's straightforward. Conversely, when you encounter traditional `function () {}` syntax, you can expect it to be more complex and requiring closer attention.
 
+The README shows [the behavior that `function` adds](../../README.md#did-you-know) and [how TypeScript treats the two forms](../../README.md#what-about-typescript).
+
 ## Behavior
 
 This rule generates warnings when traditional function syntax (`function () {}`) is used when it could be replaced with arrow function syntax (`() => {}`). The fixes preserve comments, whitespace, and types.

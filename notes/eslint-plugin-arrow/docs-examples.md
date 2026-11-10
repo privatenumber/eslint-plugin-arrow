@@ -23,3 +23,12 @@ The docs lint runs on code blocks. `function foo() {}` and its fix `const foo = 
 For each `// ❌` block, the test fixes the code with only that rule enabled, or with the recommended config for the README, and asserts that the output equals the next `// ✅` block and that nothing remains to report. For each `// ✅` block on its own, it asserts that `Linter#verify` returns no messages. A `// ✅` block that follows a `// ❌` block is checked only as the fix output.
 
 The test found two errors when it was added: the `export default` split added a `;` that the declaration fix did not, which led to a fix in the rule, and one hand-written fixed example had a blank line that the fix does not produce. A first version checked unpaired `// ✅` blocks with `verifyAndFix`, whose messages are the ones left after fixing, so a reportable example passed. Moving a reported call above its declaration in a `// ✅` block now fails the test.
+
+## README teaching examples
+
+The README's "Did you know?" and "What about TypeScript?" sections explain what `function` adds before the README introduces the rules. Their snippets use `<!-- eslint-skip -->` and no `// ❌` or `// ✅` label, because they show language behavior, not rule output, so the docs test does not check them.
+
+Each result in a comment was observed on 2026-11-10:
+
+- Runtime results: Node.js v26.13.0 with `node --input-type=module -e '<snippet>'`. The redeclaration example sits inside a function body, because two top-level function declarations with the same name are a `SyntaxError` in a module.
+- TypeScript diagnostics: TypeScript 6.0.3 with `strict: true`, from `ts.getPreEmitDiagnostics` on an in-memory file for each row: TS2730 for a `this` parameter, TS2775 and TS18048 for an assertion arrow function, TS2322 after a call to a `never` arrow function, and TS2451 for a `const` merged with a `namespace`. The `.d.ts` example matches `ts.transpileDeclaration` output, as in [../typescript/declaration-emit.md](../typescript/declaration-emit.md).

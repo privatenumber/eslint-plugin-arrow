@@ -25,13 +25,116 @@ export const main = () => helper(1)
 ```
 <!-- eslint-enable arrow-body-style -->
 
+## Did you know?
+
+Every `function` comes with extra behavior. Most functions never use it, but a reader can't know that without checking.
+
+**It can run before its definition.** Function declarations are hoisted, so you can call one above the line that defines it:
+
+<!-- eslint-skip -->
+```js
+greet() // Works
+function greet() {}
+```
+
+**Its `this` depends on how you call it.** Store a method in a variable, and the method loses its object:
+
+<!-- eslint-skip -->
+```js
+const counter = {
+    count: 0,
+    get() { return this.count }
+}
+const get = counter.get
+get() // TypeError: Cannot read properties of undefined (reading 'count')
+```
+
+**It has a hidden `arguments` object.** A function can read arguments that it doesn't declare as parameters:
+
+<!-- eslint-skip -->
+```js
+function sum() { return arguments.length }
+sum(1, 2, 3) // 3
+```
+
+**It's also a constructor.** You can call any `function` with `new`, and it has a `prototype` object:
+
+<!-- eslint-skip -->
+```js
+function greet() {}
+new greet() // greet {}
+greet.prototype // {}
+```
+
+**It can be replaced.** You can assign a new value to a function declaration. Inside a function body, a second declaration with the same name also replaces the first, with no error:
+
+<!-- eslint-skip -->
+```js
+function run() {
+    function a() { return 1 }
+    function a() { return 2 }
+    return a() // 2
+}
+
+function b() {}
+b = 5 // No error
+```
+
+An arrow function stored in a `const` has none of this behavior:
+
+| Behavior | `const` arrow function |
+| --- | --- |
+| Use before definition | Throws `Cannot access 'greet' before initialization` |
+| `this` | Uses the `this` of the code around it |
+| `arguments` | Uses the `arguments` of the code around it |
+| `new` | Throws `greet is not a constructor` |
+| Replacement | Assignment throws `Assignment to constant variable`, and a second declaration is a syntax error |
+
+Sloppy mode and classic scripts add a few more differences. The [`prefer-arrow-functions` limitations](./docs/rules/prefer-arrow-functions.md#limitations) list them.
+
 ## Why?
 
 In ES6, we started preferring `const` over `let`, and `let` over `var`. Narrower syntax signals to the reader what *can't* happen, so there's less to keep in mind. A `const`, for example, will never be reassigned, and can't be used before it's declared.
 
-But functions got left behind. `function` is still the default, even though it carries a lot of extra behavior: it's hoisted, its `this` depends on how it's called, it creates an `arguments` object, and it can be used as a constructor with `new`. Arrow functions are the narrower option — none of that applies.
+But functions got left behind. `function` is still the default, even though it carries all the behavior above. Arrow functions are the narrower option.
 
 So default to arrow functions, and reserve `function` for code that actually needs that behavior. Then, just as `let` signals "this will be reassigned," `function` becomes a signal too: "something specific is going on here."
+
+## What about TypeScript?
+
+The fixes keep every type annotation, so the converted function has the same type. A few things still differ.
+
+**An arrow function can take its type from a variable annotation.** A function type annotation types all the parameters and the return value at once. A function declaration can't have this annotation, so you type each parameter on its own:
+
+```ts
+type Handler = (event: MouseEvent) => void
+
+// `event` is a MouseEvent
+const onClick: Handler = (event) => {}
+```
+
+**Declaration files show a `const`.** An exported function becomes a constant with a function type in the `.d.ts` output. The parameter types, return type, type parameters, and JSDoc stay the same, so code that uses the function gets the same types:
+
+<!-- eslint-skip -->
+```ts
+// Before
+export declare function parse(input: string): number
+
+// After
+export declare const parse: (input: string) => number
+```
+
+**Some TypeScript features only work on function declarations.** `prefer-arrow-functions` keeps these functions as `function`:
+
+| Feature | Example | As a `const` arrow function |
+| --- | --- | --- |
+| Overloads | `function f(v: string): string` | `const` has no overload syntax |
+| `this` parameter | `function f(this: Window) {}` | TS2730: An arrow function cannot have a 'this' parameter |
+| Assertion function | `function assert(v: unknown): asserts v {}` | TS2775, and the call no longer narrows the type |
+| `never` return type | `function fail(): never { throw error }` | Code after the call is no longer unreachable, so the type isn't narrowed |
+| Namespace merging | `function f() {}` with `namespace f {}` | TS2451: Cannot redeclare block-scoped variable |
+
+The [rule's TypeScript limitations](./docs/rules/prefer-arrow-functions.md#typescript-1) list the other cases it keeps.
 
 ## Install
 

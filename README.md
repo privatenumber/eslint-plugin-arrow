@@ -84,7 +84,7 @@ function b() {}
 b = 5 // No error
 ```
 
-**And all of this assumes strict mode.** ES modules and class bodies are always strict. But CommonJS files and classic `<script>`s run in sloppy mode unless they start with `'use strict'`, and sloppy mode gives `function` even more footguns:
+**And all of this is just in "strict mode".** ES modules and class bodies are always strict. But CommonJS files and classic `<script>`s run in _sloppy mode_ unless they start with `'use strict'`, and sloppy mode gives `function` even more footguns:
 
 - **`this` becomes `globalThis`.** The detached `get()` above doesn't throw. It silently reads `globalThis.count`. A primitive passed as `this` is wrapped in an object, so `f.call(1)` sees `typeof this === 'object'`.
 - **`arguments` is linked to the parameters.** In `function f(x) { arguments[0] = 9; return x }`, the call `f(1)` returns `9`. This applies when the parameters have no defaults, rest, or destructuring.
@@ -94,11 +94,9 @@ b = 5 // No error
 - **Declarations in a block can be visible outside the block.**
 - **Top-level declarations in a classic script become globals**, such as `window.f`.
 
-`prefer-arrow-functions` keeps functions that depend on the last three, as its [limitations](./docs/rules/prefer-arrow-functions.md#limitations) describe.
-
 ### Enter arrow functions
 
-Arrow functions drop all of it. An arrow function in a `const` does one thing: it runs its body when you call it. The error messages below are from Node.js:
+Arrow functions solves all of it. An arrow function in a `const` does one thing: it runs its body when you call it. The error messages below are from Node.js:
 
 | `function` | `const` arrow function |
 | --- | --- |

@@ -26,13 +26,13 @@ The test found two errors when it was added: the `export default` split added a 
 
 ## README teaching examples
 
-The README's "Did you know?" and "What about TypeScript?" sections explain what `function` adds before the README introduces the rules. Their snippets have no `// ❌` or `// ✅` label, because they show language behavior, not rule output, so the docs test does not check them. Snippets that the docs lint would report use `<!-- eslint-skip -->`.
+The README's "Did you know?" and "What about TypeScript?" sections explain what `function` adds before the README introduces the rules. Their snippets have no `// ❌` or `// ✅` label, because they show language behavior, not rule output, so the docs test does not check them. Snippets that would fail the docs lint use `<!-- eslint-skip -->`. The `Handler` example is linted and only produces unused-variable warnings.
 
 Each result in a comment was observed on 2026-11-10:
 
 - Runtime results: Node.js v26.13.0 with `node --input-type=module -e '<snippet>'`. The redeclaration example sits inside a function body, because two top-level function declarations with the same name are a `SyntaxError` in a module.
 - Sloppy mode results: Node.js v26.13.0 with `node -e '<snippet>'`, which runs sloppy CommonJS. A detached `function` call sees `this === globalThis`. `f.call(1)` sees `typeof this === 'object'`, and `'number'` with `'use strict'`. `function f(x) { arguments[0] = 9; return x }` returns `9` for `f(1)`, and `1` with `'use strict'`. `f.caller` is the calling function. `(function f() { f = 1; return typeof f })()` returns `'function'`, and throws `Assignment to constant variable.` with `'use strict'`.
-- Related APIs: with an arrow function, `Reflect.construct()` and `class extends` throw `... is not a constructor`, and `instanceof` throws `Function has non-object prototype 'undefined' in instanceof check`. `call` and `bind` don't change an arrow function's `this`.
+- Related APIs: with an arrow function, `Reflect.construct()` and `class extends` throw `... is not a constructor`, and `({}) instanceof arrow` throws `Function has non-object prototype 'undefined' in instanceof check`. A primitive left operand, such as `1 instanceof arrow`, returns `false` instead. `call` and `bind` don't change an arrow function's `this`.
 - TypeScript diagnostics: TypeScript 6.0.3 with `strict: true`, from `ts.getPreEmitDiagnostics` on an in-memory file for each row: TS2730 for a `this` parameter, TS2775 and TS18048 for an assertion arrow function, TS2322 after a call to a `never` arrow function, and TS2451 for a `const` merged with a `namespace` that exports a value. An empty `namespace` merges with a `const` without an error, so the README example exports a value. With an explicit function type on the variable, such as `const fail: () => never = ...`, assertion and `never` arrow functions narrow like declarations, so the README describes these as breaking in a direct conversion, not as declaration-only features.
 - Declaration output: the README's `.d.ts` example matches `ts.transpileDeclaration` output, as in [../typescript/declaration-emit.md](../typescript/declaration-emit.md).
 
@@ -40,5 +40,5 @@ The README and rule doc claim only that the fixes keep written type annotations,
 
 - `export function f(n: number) { if (n) return f(n - 1); return 1 }` type-checks. As `export const f = (n: number) => ...`, it reports TS7023.
 - `export function f() { throw Error() }` emits `export declare function f(): void;`. As an arrow function, it emits `export declare const f: () => never;`.
-- With `lib.ts` exporting `function f() {}` and `aug.ts` containing `declare module './lib' { namespace f { let extra: number } }`, `tsc` passes. After conversion to `const`, it reports TS2451 and TS2339.
+- With `lib.ts` containing `export function f() {}`, and `aug.ts` containing `import { f } from './lib'`, `declare module './lib' { namespace f { let extra: number } }`, and `f.extra = 1`, `tsc` passes with `"moduleResolution": "bundler"`. After conversion to `const`, it reports TS2451 and TS2339.
 - With `checkJs`, `/** @this {Window} */ export function f() {}` type-checks, and `/** @this {Window} */ export const f = () => {}` reports TS2730.

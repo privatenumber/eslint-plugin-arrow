@@ -82,14 +82,14 @@ function b() {}
 b = 5 // No error
 ```
 
-**And all of this assumes strict mode.** ES modules and class bodies are always strict. But CommonJS files without `'use strict'` and classic `<script>`s run in sloppy mode, where `function` has even more footguns:
+**And all of this assumes strict mode.** ES modules and class bodies are always strict. But CommonJS files and classic `<script>`s run in sloppy mode unless they start with `'use strict'`, and sloppy mode gives `function` even more footguns:
 
 - **`this` becomes `globalThis`.** The detached `get()` above doesn't throw. It silently reads `globalThis.count`. A primitive passed as `this` is wrapped in an object, so `f.call(1)` sees `typeof this === 'object'`.
-- **`arguments` is linked to the parameters.** In `function f(x) { arguments[0] = 9; return x }`, the call `f(1)` returns `9`.
-- **A function can see its caller.** `f.caller` is the function that called `f`, and `arguments.callee` is `f` itself.
+- **`arguments` is linked to the parameters.** In `function f(x) { arguments[0] = 9; return x }`, the call `f(1)` returns `9`. This applies when the parameters have no defaults, rest, or destructuring.
+- **A function can see its caller.** `f.caller` can return the function that called `f`. With simple parameters, `arguments.callee` returns `f` itself.
 - **Assigning to a named function expression's own name fails silently.** Inside `(function f() { f = 1 })`, `f` is still the function after the assignment. Strict mode throws.
 - **Parameter names can repeat**, as in `function f(a, a) {}`.
-- **Declarations in a block are visible outside the block.**
+- **Declarations in a block can be visible outside the block.**
 - **Top-level declarations in a classic script become globals**, such as `window.f`.
 
 `prefer-arrow-functions` keeps functions that depend on the last three, as its [limitations](./docs/rules/prefer-arrow-functions.md#limitations) describe.
@@ -146,7 +146,7 @@ export declare const parse: (input: string) => number
 | `never` return type | `function fail(): never { throw error }` | Code after the call is no longer unreachable, so the type isn't narrowed |
 | Namespace merging | `function f() {}` with `namespace f { export const x = 1 }` | TS2451: Cannot redeclare block-scoped variable |
 
-The rule only sees the current file and the written types. Its [limitations](./docs/rules/prefer-arrow-functions.md#limitations) list every case it keeps, and [Code the rule cannot check](./docs/rules/prefer-arrow-functions.md#code-the-rule-cannot-check) lists type changes it can miss, such as inferred return types.
+The rule only sees the current file and the written types. Its [limitations](./docs/rules/prefer-arrow-functions.md#limitations) list the cases it keeps, and [Code the rule cannot check](./docs/rules/prefer-arrow-functions.md#code-the-rule-cannot-check) lists type changes it can miss, such as inferred return types.
 
 ## Install
 

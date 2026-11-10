@@ -25,6 +25,59 @@ export const main = () => helper(1)
 ```
 <!-- eslint-enable arrow-body-style -->
 
+## Install
+
+```sh
+npm install -D eslint-plugin-arrow
+```
+
+Requires Node.js 22 or later, and ESLint 9 or later or Oxlint.
+
+### ESLint
+
+```js
+// eslint.config.js
+import arrow from 'eslint-plugin-arrow'
+
+export default [
+    arrow.configs.recommended
+]
+```
+
+The recommended config enables both rules with their default options. Each rule's docs describe its options.
+
+### Oxlint
+
+Oxlint runs the same plugin through [JS plugins](https://oxc.rs/docs/guide/usage/linter/js-plugins). Extend the plugin's recommended config in `oxlint.config.ts`:
+
+```ts
+// oxlint.config.ts
+import { defineConfig } from 'oxlint'
+import arrow from 'eslint-plugin-arrow/oxlint'
+
+export default defineConfig({
+    extends: [arrow]
+})
+```
+
+`.oxlintrc.json` can't extend a package by name ([oxc#15538](https://github.com/oxc-project/oxc/issues/15538)), so extend the config file by path instead:
+
+```json
+{
+    "extends": [
+        "./node_modules/eslint-plugin-arrow/oxlint.json"
+    ]
+}
+```
+
+> [!WARNING]
+> Oxlint [describes JS plugins as alpha](https://oxc.rs/docs/guide/usage/linter/js-plugins), so their behavior can change between Oxlint releases.
+
+Oxlint differs from ESLint in two ways:
+
+- `oxlint --fix` applies one pass of fixes per run, while `eslint --fix` repeats until nothing changes. If a function needs to be both moved and converted, run `oxlint --fix` again to apply the remaining fix.
+- Oxlint has no `sourceType` setting. It parses a `.js` file without `import` or `export` as a classic script, even in a CommonJS package, and in a classic script a top-level function declaration is a global variable. So `prefer-arrow-functions` keeps top-level function declarations in those files. Use the `.cjs` extension to have them converted.
+
 ## Did you know?
 
 Every `function` comes with extra behavior. Most functions never use it, but a reader can't know that without checking.
@@ -119,7 +172,7 @@ So default to arrow functions, and keep `function` for code that needs what it a
 
 ### What about TypeScript?
 
-The fixes keep type annotations as written. But a function declaration and a `const` arrow function are still different to TypeScript.
+TypeScript treats the two forms differently too. Some differences favor arrow functions, and some favor declarations.
 
 **An arrow function can take its type from a variable annotation.** A function type annotation types all the parameters and the return value at once. A function declaration can't have this annotation, so you type each parameter on its own:
 
@@ -130,81 +183,28 @@ type Handler = (event: MouseEvent) => void
 const onClick: Handler = (event) => {}
 ```
 
-**Declaration files show a `const`.** An exported function in a `.ts` file becomes a constant with a function type in the `.d.ts` output. Annotated parameter types, return types, and type parameters keep the same text:
+**Declaration files show a `const`.** An exported `const` arrow function appears in `.d.ts` output as a constant with a function type. For the same written signature, only the form differs:
 
 <!-- eslint-skip -->
 ```ts
-// Before
+// From a function declaration
 export declare function parse(input: string): number
 
-// After
+// From a const arrow function
 export declare const parse: (input: string) => number
 ```
 
-**Some TypeScript features break in a direct conversion.** A `const` arrow function supports some of them only when the variable has an explicit function type, and the fix doesn't write that type for you. So `prefer-arrow-functions` keeps these functions as `function`:
+**Some features need a function declaration, or extra types on a `const`:**
 
-| Feature | Example | After a direct conversion |
+| Feature | Example | As a `const` arrow function |
 | --- | --- | --- |
-| Overloads | `function f(v: string): string` | `const` has no overload syntax. It needs an overloaded function type instead. |
-| `this` parameter | `function f(this: Window) {}` | TS2730: An arrow function cannot have a 'this' parameter |
-| Assertion function | `function assert(v: unknown): asserts v {}` | TS2775, and the call no longer narrows the type |
-| `never` return type | `function fail(): never { throw error }` | Code after the call is no longer unreachable, so the type isn't narrowed |
-| Namespace merging | `function f() {}` with `namespace f { export const x = 1 }` | TS2451: Cannot redeclare block-scoped variable |
+| Overloads | `function f(v: string): string` | Needs an overloaded function type on the variable |
+| `this` parameter | `function f(this: Window) {}` | Not supported (TS2730) |
+| Assertion function | `function assert(v: unknown): asserts v {}` | Needs an explicit function type on the variable, or the call stops narrowing (TS2775) |
+| `never` return type | `function fail(): never { throw error }` | Needs an explicit function type on the variable, or code after the call stops being unreachable |
+| Namespace merging | `function f() {}` with `namespace f { export const x = 1 }` | Not supported (TS2451) |
 
-The rule only sees the current file and the written types. Its [limitations](./docs/rules/prefer-arrow-functions.md#limitations) list the cases it keeps, and [Code the rule cannot check](./docs/rules/prefer-arrow-functions.md#code-the-rule-cannot-check) lists type changes it can miss, such as inferred return types.
-
-## Install
-
-```sh
-npm install -D eslint-plugin-arrow
-```
-
-Requires Node.js 22 or later, and ESLint 9 or later or Oxlint.
-
-### ESLint
-
-```js
-// eslint.config.js
-import arrow from 'eslint-plugin-arrow'
-
-export default [
-    arrow.configs.recommended
-]
-```
-
-The recommended config enables both rules with their default options. Each rule's docs describe its options.
-
-### Oxlint
-
-Oxlint runs the same plugin through [JS plugins](https://oxc.rs/docs/guide/usage/linter/js-plugins). Extend the plugin's recommended config in `oxlint.config.ts`:
-
-```ts
-// oxlint.config.ts
-import { defineConfig } from 'oxlint'
-import arrow from 'eslint-plugin-arrow/oxlint'
-
-export default defineConfig({
-    extends: [arrow]
-})
-```
-
-`.oxlintrc.json` can't extend a package by name ([oxc#15538](https://github.com/oxc-project/oxc/issues/15538)), so extend the config file by path instead:
-
-```json
-{
-    "extends": [
-        "./node_modules/eslint-plugin-arrow/oxlint.json"
-    ]
-}
-```
-
-> [!WARNING]
-> Oxlint [describes JS plugins as alpha](https://oxc.rs/docs/guide/usage/linter/js-plugins), so their behavior can change between Oxlint releases.
-
-Oxlint differs from ESLint in two ways:
-
-- `oxlint --fix` applies one pass of fixes per run, while `eslint --fix` repeats until nothing changes. If a function needs to be both moved and converted, run `oxlint --fix` again to apply the remaining fix.
-- Oxlint has no `sourceType` setting. It parses a `.js` file without `import` or `export` as a classic script, even in a CommonJS package, and in a classic script a top-level function declaration is a global variable. So `prefer-arrow-functions` keeps top-level function declarations in those files. Use the `.cjs` extension to have them converted.
+`prefer-arrow-functions` keeps these functions as `function`, because its autofix doesn't add type annotations. It also only sees the current file and the types written in it. Its [limitations](./docs/rules/prefer-arrow-functions.md#limitations) list the cases it keeps, and [Code the rule cannot check](./docs/rules/prefer-arrow-functions.md#code-the-rule-cannot-check) lists type changes it can miss, such as inferred return types.
 
 ## Rules
 

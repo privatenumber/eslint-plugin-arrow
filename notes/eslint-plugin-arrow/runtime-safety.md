@@ -134,9 +134,11 @@ Issue [#7](https://github.com/privatenumber/eslint-plugin-arrow/issues/7). The r
 - an operand of `&&`, `||`, or `??`
 - parentheses around a function expression
 
-The same wrappers count on a direct use, so `new (F as any)()` is a constructor use like `new F()`. A group records whether any member is constructed, has a disallowed property read, or has its source read. A function is kept when any group it belongs to has a flag set.
+The same wrappers count on a direct use, so `new (F as any)()` is a constructor use like `new F()`. They also count on an assignment target, because TypeScript removes them: `b! = F` and `(b as any) = F` make `b` an alias.
 
-Groups are undirected, so they are conservative: in `let a = f; a = g; new a()`, both `f` and `g` are kept, although only the value in `a` at the `new` matters. Following the order of writes needs data flow analysis. Building the groups visits each reference once per file, so the cost stays linear in the number of references.
+A destructuring assignment evaluates to its right side, so in `const b = ({} = F)`, `b` is `F`. Following both the pattern and the result would need a second walk, so when the result of a destructuring assignment is used, the rule keeps the function. As a statement, `({ prototype } = F)` is classified by its keys like a destructuring declaration. A group records whether any member is constructed, has a disallowed property read, or has its source read. A function is kept when any group it belongs to has a flag set.
+
+Groups are undirected, so they are conservative: in `let a = f; a = g; new a()`, both `f` and `g` are kept, although only the value in `a` at the `new` matters. Following the order of writes needs data flow analysis. Building the groups visits each reference once per file. On real code the cost is close to linear, but synthetic inputs that put hundreds of functions or identifiers in one expression, such as `a0 = a1 = ... = (f0 || f1 || ...)`, are quadratic: about 140 ms for 800 of each, against 34 ms without the rule. The rule accepts that, because removing it needs shared state across groups.
 
 Three other forms read a property without a member expression on the name, and also count:
 

@@ -1286,6 +1286,68 @@ describe('prefer-arrow-functions', () => {
 				},
 			],
 		});
+		ruleTester.run('never aliases', preferArrowFunctions, {
+			valid: [
+				{
+					name: 'never alias / direct',
+					code: 'type N = never; function f(): N { throw e }',
+				},
+				{
+					name: 'never alias / value parameter with the same name',
+					code: 'type N = never; (N = 0) => { function f(): N { throw e } }',
+				},
+				{
+					name: 'never alias / transitive',
+					code: 'type N = M; type M = never; function f(): N { throw e }',
+				},
+				{
+					name: 'never alias / shared chain',
+					code: 'type N = M; type M = never; function f(): N { throw e } function g(): M { throw e }',
+				},
+				{
+					name: 'never alias / generic',
+					code: 'type N<T> = never; function f(): N<1> { throw e }',
+				},
+				{
+					name: 'never alias / class method',
+					code: 'type N = never; class A { f(): N { throw e } }',
+					options: [{ classMethods: true }],
+				},
+			],
+			invalid: [
+				{
+					name: 'never alias / cycle',
+					code: 'type A = B; type B = A; function f(): A { throw e }',
+					output: 'type A = B; type B = A; const f = (): A => { throw e }',
+					errors: [{ messageId: 'preferArrowFunction' }],
+				},
+				{
+					name: 'never alias / shared cycle',
+					code: 'type A = B; type B = A; function f(): A {} function g(): B {}',
+					output: 'type A = B; type B = A; const f = (): A => {}; const g = (): B => {}',
+					errors: [{ messageId: 'preferArrowFunction' }, { messageId: 'preferArrowFunction' }],
+				},
+				{
+					name: 'never alias / void',
+					code: 'type N = void; function f(): N {}',
+					output: 'type N = void; const f = (): N => {}',
+					errors: [{ messageId: 'preferArrowFunction' }],
+				},
+				{
+					// Conditional types are a documented limit; the rule does not evaluate them
+					name: 'never alias / conditional',
+					code: 'type N<T> = T extends 1 ? never : 1; function f(): N<1> { throw e }',
+					output: 'type N<T> = T extends 1 ? never : 1; const f = (): N<1> => { throw e }',
+					errors: [{ messageId: 'preferArrowFunction' }],
+				},
+				{
+					name: 'never alias / shadowed type parameter',
+					code: 'type N = never; function f<N>(): N { throw e }',
+					output: 'type N = never; const f = <N>(): N => { throw e }',
+					errors: [{ messageId: 'preferArrowFunction' }],
+				},
+			],
+		});
 	});
 
 	describe('classMethods', () => {

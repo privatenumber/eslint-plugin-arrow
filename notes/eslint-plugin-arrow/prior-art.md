@@ -39,10 +39,13 @@ The differences we observed:
 
 The project exists because the earlier versions of that plugin dropped comments and formatting ([JamieMason/eslint-plugin-prefer-arrow-functions#24](https://github.com/JamieMason/eslint-plugin-prefer-arrow-functions/issues/24)). Its `never` issue, [#45](https://github.com/JamieMason/eslint-plugin-prefer-arrow-functions/issues/45), is closed, but 3.10.2 still converted the function in our run.
 
+Its source at commit `d65cd04` ([`getConstructorUsages`](https://github.com/JamieMason/eslint-plugin-prefer-arrow-functions/blob/d65cd0477437fa07a11a6868c65437db63cf8fac/src/guard.ts#L364-L389)) collects the text of every `new` callee, `instanceof` right side, `extends` clause, and `.prototype` object in the file, and skips a function whose name matches. So, from reading the source, it does not follow aliases either: `const B = A; new B()` records `B`, not `A`. This was not run.
+
 ### Other tools
 
 - [eslint-plugin-prefer-arrow](https://github.com/TristonJ/eslint-plugin-prefer-arrow) 1.2.3 reported every input in our run but fixed none of them.
 - ESLint's [`prefer-arrow-callback`](https://eslint.org/docs/latest/rules/prefer-arrow-callback) and Biome's `useArrowFunction` fix function expressions only, not declarations or methods. See [../biome/plugins.md](../biome/plugins.md).
+- Biome's `useArrowFunction` skips a function expression that is directly the callee of `new` or an `extends` clause, and has two open reports of constructor use it misses: [biomejs/biome#12372](https://github.com/biomejs/biome/issues/12372) (`.prototype` access) and [biomejs/biome#9585](https://github.com/biomejs/biome/issues/9585) (`vi.fn(function () {})` called with `new`).
 - ESLint's and Oxlint's `func-style` and Biome's `useConsistentFunctionStyle` can report function declarations, but none of them fix them. Oxlint's [`func-style`](https://oxc.rs/docs/guide/usage/linter/rules/eslint/func-style) docs say an autofix is "planned, but not implemented".
 
 ## `no-function-hoisting`

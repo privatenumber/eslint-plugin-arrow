@@ -110,7 +110,61 @@ Mutation results: removing the recursion fails the four `hoisting / through ...`
 
 Found in mochajs/mocha and acornjs/acorn. The rule skipped functions whose `.name`, `.length`, or `.prototype` was read through a variable, but not when read directly on the expression: `function foo() {}.name === 'foo'` became `(() => {}).name === 'foo'`, which is `false`. mocha used that expression to detect function name support, so four tests started to skip. acorn's tests passed `(function () {...}).toString()` to its parser, and the arrow function source failed to parse with `ecmaVersion: 5`.
 
-**Decision:** the rule checks property reads on the expression too, and `toString` joined the checked properties, because an arrow function's source text differs. Code that calls `toString()` on a function passed in from elsewhere remains undetectable, and the rule docs warn about it.
+**Decision:** the rule checks property reads on the expression too, and `toString` joined the checked properties, because an arrow function's source text differs. [Which function properties the rule checks](#which-function-properties-the-rule-checks) revises the list. Code that calls `toString()` on a function passed in from elsewhere remains undetectable, and the rule docs warn about it.
+
+## Which function properties the rule checks
+
+Issues [#2](https://github.com/privatenumber/eslint-plugin-arrow/issues/2) and [#8](https://github.com/privatenumber/eslint-plugin-arrow/issues/8). The checked list was `prototype`, `name`, `length`, and `toString`. [../ecmascript/function-properties.md](../ecmascript/function-properties.md) measured every property on every form the fix produces, in V8 and JavaScriptCore.
+
+**Decision**, shipping with the PRs that close #2 and #8: the list becomes `prototype`, `name`, `toString`, `caller`, and `arguments`.
+
+- Add `caller` and `arguments`. A sloppy `function` returns `null` or a value, and every other form throws `TypeError`. The rule skips them in strict code too: a read of `f.caller` is rare, so the skip costs almost nothing, and the rule does not need a second strictness check.
+- Remove `length`. The built-in value was `2` for every form of `f(a, b) {}`, so reading it does not change behavior. Code can redefine `length` with a getter that inspects the function, but that is not worth a skip for every `length` read. This is the only change in the list that converts more code.
+- Removing `length` also removes accidental protection. In 1.0.0, a `length` read kept functions that other checks miss: the type cases in [type-safety.md](./type-safety.md), a direct `eval` ([#11](https://github.com/privatenumber/eslint-plugin-arrow/issues/11)), and construction through `Reflect.construct` ([#10](https://github.com/privatenumber/eslint-plugin-arrow/issues/10)). The `length` removal therefore depends on the skips for #3, #4, #5, #6, #9, and #11. #10 stays a documented limit.
+- Keep `name`. Every form keeps the name by default, but `namedFunctionExpressions: true` is documented to change it, and the check protects that opt-in.
+
+## Constructor use through an alias
+
+Issue [#7](https://github.com/privatenumber/eslint-plugin-arrow/issues/7). The rule skips a function used with `new`, `instanceof`, or `extends`, or whose properties are read, but only through its own name. `const B = A; new B()` converted `A`, and threw `TypeError: B is not a constructor`. Biome has related open gaps; see [prior-art.md](./prior-art.md#other-tools).
+
+**Decision**, shipping with the PR that closes #7: apply the constructor and property checks to every variable the function's value can flow into by simple assignment. The rule groups such variables into alias groups, once per file and only when a function needs them. Two variables are in the same group when one is assigned to the other by a declarator initializer or an assignment, including each target of a chained `a = b = F`. The value can pass through:
+
+- a TypeScript wrapper: `as`, `satisfies`, `!`, `<T>`, or an instantiation expression such as `F<T>`
+- a branch of a conditional expression
+- an operand of `&&`, `||`, or `??`
+- parentheses around a function expression
+
+The same wrappers count on a direct use, so `new (F as any)()` is a constructor use like `new F()`. They also count on an assignment target, because TypeScript removes them: `b! = F` and `(b as any) = F` make `b` an alias.
+
+A destructuring assignment evaluates to its right side, so in `const b = ({} = F)`, `b` is `F`. Following both the pattern and the result would need a second walk, so when the result of a destructuring assignment is used, the rule keeps the function. As a statement, `({ prototype } = F)` is classified by its keys like a destructuring declaration. A group records whether any member is constructed, has a disallowed property read, or has its source read. A function is kept when any group it belongs to has a flag set.
+
+Groups are undirected, so they are conservative: in `let a = f; a = g; new a()`, both `f` and `g` are kept, although only the value in `a` at the `new` matters. Following the order of writes needs data flow analysis. Building the groups visits each reference once per file. On real code the cost is close to linear, but synthetic inputs that put hundreds of functions or identifiers in one expression, such as `a0 = a1 = ... = (f0 || f1 || ...)`, are quadratic: about 140 ms for 800 of each, against 34 ms without the rule. The rule accepts that, because removing it needs shared state across groups.
+
+Three other forms read a property without a member expression on the name, and also count:
+
+- an assignment that binds a function expression after the declaration, as in `let f; f = function () {}; f.caller`
+- object destructuring with a static key, as in `const { prototype } = F`
+- a template literal key with no substitutions, as in ``f[`caller`]``
+
+Each converts in 1.0.0, verified for `caller`, `prototype`, `name`, and `new`.
+
+Keeping a function whose `caller` is read does not keep its callers. In `function f() { return f.caller.arguments[0] }`, the read reaches the calling function's `arguments`, which throws if that caller was converted. The rule cannot know which functions call `f`, so the rule docs name this limit and point to `allowedNames`.
+
+Not followed, and documented as limits: objects and arrays (`{ A }`, `[A]`), destructuring the function out of an object, function arguments (`vi.fn(A)`, `Reflect.construct(A, [])`), and returns. Each would need to follow values through data structures or calls, which needs data flow analysis. The call argument case has its own issue, because Biome #9585 shows it in real test code.
+
+## Direct `eval`
+
+Issue [#11](https://github.com/privatenumber/eslint-plugin-arrow/issues/11). The rule finds uses of `this`, `arguments`, `new.target`, and `super` through scope analysis, which cannot see inside a string. `function f(a) { return eval('arguments[0]') }` converted, and the arrow function threw `ReferenceError` in a module. In CommonJS it read the module wrapper's `arguments` instead, so `f(42)` returned the `exports` object.
+
+**Decision**, shipping with the PR that closes #11: skip a function when it contains a call whose callee is the identifier `eval`, in its body or its parameter defaults,, after removing parentheses and the TypeScript wrappers `as`, `satisfies`, `!`, `<T>`, and instantiation expressions such as `eval<T>`. The check is syntactic and does not look at what `eval` resolves to. It covers three cases that a check of unresolved references misses:
+
+- A local binding can hold the real `eval`. In sloppy mode, `function f(eval, a) { return eval('arguments[1]') }` called as `f(globalThis.eval, 42)` is a direct eval and returns `42`.
+- TypeScript removes its wrappers, so `eval!(code)` and `(eval as any)(code)` emit a direct `eval(code)`.
+- Optional calls count. `eval?.(code)` is indirect in JavaScript, but TypeScript 6.0.3 with a target below ES2020 emits `eval === null || eval === void 0 ? void 0 : eval(code)`, which ends in a direct call.
+
+Parameter defaults run in the function's scope, so `function f(a = eval('arguments[1]'))` reads `f`'s own `arguments`. `(0, eval)(code)` and `globalThis.eval(code)` do not count, because no emit makes them direct. A call inside a nested function also counts. That is exact for a nested arrow function and conservative for a nested `function`, which the rule accepts because direct `eval` is rare.
+
+The skip protects only the function that contains the call. Evaluated code can also call another function in scope, or read a `super` member, and the rule still converts that function: in `function a() { const x = eval('b()'); function b() {} return x }`, the converted `const b` is not initialized when `eval` runs. With `classMethods`, keeping an overriding method that calls `eval` while converting the method it overrides lets the field shadow it. That is the documented override limit of `classMethods`, which every other reason for keeping a method shares, so the rule does not match methods across classes for `eval` alone.
 
 ## Checked and unchanged
 

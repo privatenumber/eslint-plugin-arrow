@@ -745,6 +745,13 @@ log(run());`,
 log(f(42));`,
 		changes: changesInAll(false),
 	},
+	{
+		name: 'locally bound eval reads arguments',
+		sourceType: 'commonjs',
+		code: `function f(eval, a) { return eval('arguments[1]') }
+log(f(globalThis.eval, 42));`,
+		changes: changesInAll(false),
+	},
 ];
 
 describe('runtime behavior', () => {

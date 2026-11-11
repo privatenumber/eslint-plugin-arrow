@@ -337,6 +337,20 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 	}]) => {
 		const untransformableFunctions = new Set<FunctionNode>();
 		const functionsUsingThis = new Set<FunctionNode>();
+		const evalCallPositions: number[] = [];
+		const evalCallIndex = (position: number) => {
+			let low = 0;
+			let high = evalCallPositions.length;
+			while (low < high) {
+				const middle = Math.floor((low + high) / 2);
+				if (evalCallPositions[middle] < position) {
+					low = middle + 1;
+				} else {
+					high = middle;
+				}
+			}
+			return low;
+		};
 
 		// Class fields shadow the prototype, so these names must stay methods.
 		// They are collected from the whole file, so class methods are reported at `Program:exit`
@@ -931,14 +945,9 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 				return false;
 			}
 
-			// Direct eval can use these bindings; nested regular functions are conservatively included
-			if (scope.through.some(({ identifier, resolved }) => (
-				(!resolved || (resolved.scope.type === 'global' && resolved.defs.length === 0))
-				&& identifier.name === 'eval'
-				&& identifier.parent.type === 'CallExpression'
-				&& identifier.parent.callee === identifier
-				&& !identifier.parent.optional
-			))) {
+			// Include nested functions: eval can read bindings that an arrow would change
+			const evalPosition = evalCallPositions[evalCallIndex(node.body.range[0])];
+			if (evalPosition !== undefined && evalPosition < node.body.range[1]) {
 				return false;
 			}
 
@@ -1191,6 +1200,21 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 		};
 
 		return {
+			CallExpression: (node) => {
+				let { callee } = node;
+				while (
+					callee.type === 'TSAsExpression'
+					|| callee.type === 'TSSatisfiesExpression'
+					|| callee.type === 'TSNonNullExpression'
+					|| callee.type === 'TSTypeAssertion'
+				) {
+					callee = callee.expression;
+				}
+				if (callee.type === 'Identifier' && callee.name === 'eval') {
+					const position = node.range[0];
+					evalCallPositions.splice(evalCallIndex(position), 0, position);
+				}
+			},
 			ThisExpression: (node) => {
 				const functionNode = getNearestFunction(node);
 				if (functionNode) {

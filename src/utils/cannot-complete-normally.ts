@@ -16,17 +16,11 @@ export const cannotCompleteNormally = (
 			return statement.body.some(cannotCompleteNormally);
 		}
 		case 'IfStatement': {
-			if (statement.test.type === 'Literal') {
-				if (statement.test.value === true) {
-					return cannotCompleteNormally(statement.consequent);
-				}
-				if (statement.test.value === false) {
-					return cannotCompleteNormally(statement.alternate);
-				}
+			const { test, consequent, alternate } = statement;
+			if (test.type === 'Literal' && typeof test.value === 'boolean') {
+				return cannotCompleteNormally(test.value ? consequent : alternate);
 			}
-			return Boolean(statement.alternate)
-				&& cannotCompleteNormally(statement.consequent)
-				&& cannotCompleteNormally(statement.alternate);
+			return cannotCompleteNormally(consequent) && cannotCompleteNormally(alternate);
 		}
 		case 'TryStatement': {
 			return cannotCompleteNormally(statement.finalizer)

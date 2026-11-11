@@ -16,7 +16,6 @@ type Options = [{
 const disallowedProperties = new Set([
 	'prototype',
 	'name',
-	'length',
 	'caller',
 	'arguments',
 	'toString',

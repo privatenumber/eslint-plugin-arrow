@@ -197,7 +197,7 @@ main();`,
 	{
 		name: 'properties read on the expression',
 		sourceType: 'module',
-		code: 'log(function foo() {}.name, (function (a, b) {}).length, typeof (function () {}).prototype, (function () { return 1 }).toString())',
+		code: 'log(function foo() {}.name, typeof (function () {}).prototype, (function () { return 1 }).toString())',
 		changes: changesInAll(false),
 	},
 
@@ -282,7 +282,7 @@ log(labeled());`,
 		sourceType: 'module',
 		code: `function pair(first, second) { return first + second }
 log(pair.length, pair(1, 2));`,
-		changes: changesInAll(false),
+		changes: changesInAll(true),
 	},
 	{
 		name: 'function name',
@@ -296,7 +296,7 @@ log(named.name);`,
 		sourceType: 'module',
 		code: `const pair = function (first, second) { return first + second };
 log(pair.length, pair(1, 2));`,
-		changes: changesInAll(false),
+		changes: changesInAll(true),
 	},
 	{
 		name: 'sloppy function caller property during call',

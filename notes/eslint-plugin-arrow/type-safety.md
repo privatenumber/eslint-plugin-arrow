@@ -1,6 +1,8 @@
 # Type safety of the fixes
 
-`prefer-arrow-functions` promises that a fix keeps code type-checking and keeps the types that other code sees. Five function shapes break that promise today. Each becomes a syntactic skip, with no type information, because the rule must behave the same in ESLint and Oxlint.
+`prefer-arrow-functions` promises that a fix keeps code type-checking and keeps the types that other code sees. Five function shapes break that promise in 1.0.0. Each becomes a syntactic skip, with no type information, because the rule must behave the same in ESLint and Oxlint.
+
+Status: these are design decisions. Each one ships with the PR that closes its issue; until then, the rule still converts the case.
 
 Last verified: 2026-11-11, TypeScript 6.0.3, ESLint 10.13.0, Oxlint 1.90.0.
 
@@ -8,7 +10,7 @@ Last verified: 2026-11-11, TypeScript 6.0.3, ESLint 10.13.0, Oxlint 1.90.0.
 
 The TypeScript behavior behind each case, with experiments, is in [../typescript/](../typescript/README.md).
 
-| Issue | Input that converts today | What changes after the fix | Evidence |
+| Issue | Input that converts in 1.0.0 | What changes after the fix | Evidence |
 | --- | --- | --- | --- |
 | [#3](https://github.com/privatenumber/eslint-plugin-arrow/issues/3) | `type N = never` and `function fail(): N { throw e }` | Calls to `fail()` stop narrowing: TS2322 | [control-flow-annotations.md](../typescript/control-flow-annotations.md) |
 | [#4](https://github.com/privatenumber/eslint-plugin-arrow/issues/4) | `function f(): typeof f { return f }` | TS7022 | [inferred-function-types.md](../typescript/inferred-function-types.md#signatures-that-read-the-functions-own-type) |
@@ -73,21 +75,21 @@ Cost, measured on the [corpus](#corpus): 106 of 4,910 named function declaration
 - A block cannot complete when its last statement cannot.
 - `if` cannot complete when it has an `else` and neither branch can.
 - `try` cannot complete when its `finally` cannot, or when its block cannot and its `catch`, if any, cannot.
-- A labeled statement cannot complete when its body cannot.
+- `if` with the literal test `true` cannot complete when its consequent cannot, and with `false`, when its `else` cannot. TypeScript 6.0.3 treats these tests as constant: `function f() { if (true) throw e }` infers `void` and its arrow function infers `never`. Other constant tests, such as `if (1)`, infer `void` in both forms.
 
 `async` functions are included, because `Promise<void>` changes to `Promise<never>`. Function expressions and object methods already infer `never`, so they do not need the skip.
 
-Not covered, and documented as limits: `while (true)`, exhaustive `switch` statements, and calls to `never` functions. Each needs loop analysis or types. In the corpus, every match ended with `throw`.
+Not covered, and documented as limits: loops such as `while (true)`, exhaustive `switch` statements, labeled statements, and calls to `never` functions. Each needs loop analysis, `break` tracking, or types. Labeled statements always count as completing, because `l: { if (x) break l; throw e }` completes through the `break` (TypeScript infers `void` for both forms), and handling labels correctly needs a search for `break` statements that target them. In the corpus, every match ended with `throw`.
 
 ### Rejected: code path analysis
 
-ESLint's code path analysis answers "is the end reachable" exactly, including loops and `switch`. It was rejected because it adds about 20% to this plugin's Oxlint runtime and finds no extra matches in the corpus ([../oxlint/js-plugins.md](../oxlint/js-plugins.md#code-path-analysis-has-a-cost)). A report of a loop or `switch` case would justify revisiting it.
+ESLint's code path analysis answers "is the end reachable" for loops too, but it is conservative, not exact: an `onCodePathEnd` probe in ESLint 10.13.0 reported a reachable end for `if (true) throw 1` and for an exhaustive `switch` over a union whose cases all throw, where TypeScript infers `never`. It was rejected because subscribing adds about 30% to this plugin's Oxlint runtime and it finds no extra matches in the corpus ([../oxlint/js-plugins.md](../oxlint/js-plugins.md#code-path-analysis-has-a-cost)). A report of a loop or `switch` case would justify revisiting it.
 
 Cost: 12 of 4,910 named function declarations (0.2%) match.
 
 ## Corpus
 
-The counts above came from an ESLint rule run with `Linter#verify` over 1,684 compiled JavaScript and TypeScript files from this repository's `node_modules`: ESLint 9.39.5 and 10.13.0, typescript-eslint 8.72.0 and 8.72.1, semver, minimatch, espree, acorn, and esquery. Duplicate package versions are counted twice. The counts come from code path analysis (#9) and scope references (#5), so they are an upper bound for the syntactic checks.
+The counts above came from an ESLint rule run with `Linter#verify` over 1,684 compiled JavaScript and TypeScript files from this repository's `node_modules`: ESLint 9.39.5 and 10.13.0, typescript-eslint 8.72.0 and 8.72.1, semver, minimatch, espree, acorn, and esquery. Duplicate package versions are counted twice. The #9 count came from code path analysis and the #5 count from scope references, so they approximate the syntactic checks rather than match them exactly.
 
 Two setup details matter when repeating it:
 

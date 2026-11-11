@@ -116,7 +116,7 @@ Found in mochajs/mocha and acornjs/acorn. The rule skipped functions whose `.nam
 
 Issues [#2](https://github.com/privatenumber/eslint-plugin-arrow/issues/2) and [#8](https://github.com/privatenumber/eslint-plugin-arrow/issues/8). The checked list was `prototype`, `name`, `length`, and `toString`. [../ecmascript/function-properties.md](../ecmascript/function-properties.md) measured every property on every form the fix produces, in V8 and JavaScriptCore.
 
-**Decision:** the list becomes `prototype`, `name`, `toString`, `caller`, and `arguments`.
+**Decision**, shipping with the PRs that close #2 and #8: the list becomes `prototype`, `name`, `toString`, `caller`, and `arguments`.
 
 - Add `caller` and `arguments`. A sloppy `function` returns `null` or a value, and every other form throws `TypeError`. The rule skips them in strict code too: a read of `f.caller` is rare, so the skip costs almost nothing, and the rule does not need a second strictness check.
 - Remove `length`. It was `2` for every form of `f(a, b) {}`, so reading it never changes behavior. This is the only change in the list that converts more code.
@@ -126,13 +126,23 @@ Issues [#2](https://github.com/privatenumber/eslint-plugin-arrow/issues/2) and [
 
 Issue [#7](https://github.com/privatenumber/eslint-plugin-arrow/issues/7). The rule skips a function used with `new`, `instanceof`, or `extends`, or whose properties are read, but only through its own name. `const B = A; new B()` converted `A`, and threw `TypeError: B is not a constructor`. Biome has open reports of related gaps in `useArrowFunction`: [biomejs/biome#12372](https://github.com/biomejs/biome/issues/12372) (`.prototype` read) and [biomejs/biome#9585](https://github.com/biomejs/biome/issues/9585) (`vi.fn(function () {})` called with `new`).
 
-**Decision:** follow simple aliases, and apply the constructor and property checks to each alias's references. An alias is a variable whose declarator initializer, or the right side of an assignment to it, is a reference to the function, optionally through:
+**Decision**, shipping with the PR that closes #7: follow simple aliases, and apply the constructor and property checks to each alias's references. An alias is a variable whose declarator initializer, or the right side of an assignment to it, is a reference to the function, optionally through:
 
 - a TypeScript wrapper: `as`, `satisfies`, `!`, or `<T>`
 - a branch of a conditional expression
 - an operand of `&&`, `||`, or `??`
 
 Aliases of aliases are followed, with a visited set, so each reference is visited at most once and the check stays O(references) per function.
+
+The same wrappers count on a direct use, so `new (F as any)()` is a constructor use like `new F()`. Three other forms read a property without a member expression on the name, and also count:
+
+- an assignment that binds a function expression after the declaration, as in `let f; f = function () {}; f.caller`
+- object destructuring with a static key, as in `const { prototype } = F`
+- a template literal key with no substitutions, as in ``f[`caller`]``
+
+An independent review of #2 found these forms. Each converts in 1.0.0, verified for `caller`, `prototype`, `name`, and `new`. They ship with #7, which owns the reference checks.
+
+Keeping a function whose `caller` is read does not keep its callers. In `function f() { return f.caller.arguments[0] }`, the read reaches the calling function's `arguments`, which throws if that caller was converted. The rule cannot know which functions call `f`, so the rule docs name this limit and point to `allowedNames`.
 
 Not followed, and documented as limits: objects and arrays (`{ A }`, `[A]`), destructuring, function arguments (`vi.fn(A)`, `Reflect.construct(A, [])`), and returns. Each would need to follow values through data structures or calls, which needs data flow analysis. The call argument case has its own issue, because Biome #9585 shows it in real test code.
 

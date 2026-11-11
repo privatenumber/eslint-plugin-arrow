@@ -98,19 +98,56 @@ Oxlint's `defineConfig` rejects rule severities typed as `string`, which is how 
 
 ## Code path analysis has a cost
 
-A JS plugin rule can subscribe to code path events such as `onCodePathEnd`, as in ESLint. In Oxlint, the subscription costs time even when the handler does nothing. In ESLint, it added no measurable time, which is consistent with ESLint always analyzing code paths. The cause inside Oxlint was not investigated.
+A JS plugin rule can subscribe to code path events such as `onCodePathEnd`, as in ESLint. In Oxlint, subscribing costs about 0.3 s on the corpus below, even when the handler is empty, which is about 30% of this plugin's runtime. Reading the code path inside the handler added nothing measurable on top. In ESLint, the subscription added no measurable time, which is consistent with ESLint always analyzing code paths. The cause inside Oxlint was not investigated.
 
 Last verified: 2026-11-11 with Oxlint 1.90.0 and ESLint 10.13.0.
 
-The corpus was 1,684 compiled JavaScript and TypeScript files (13 MB) copied from this repository's `node_modules`: ESLint 9 and 10, typescript-eslint 8.72, semver, minimatch, espree, acorn, and esquery. Each config ran 5 times, alternating, with `oxlint -c <config> --threads 1 corpus`:
+### Setup
 
-| Rules | Wall time (s) |
-| --- | --- |
-| Empty `FunctionDeclaration` handler | 0.56, 0.57, 0.59, 0.59, 0.63 |
-| The same, plus an `onCodePathEnd` handler that reads `returnedSegments` | 0.79, 0.82, 0.82, 0.85, 0.85 |
-| `arrow/prefer-arrow-functions` from `dist/` | 0.95, 0.97, 1.02, 1.44, 1.52 |
-| `arrow/prefer-arrow-functions` plus the code path rule | 1.14, 1.18, 1.24, 1.24, 1.28 |
+The corpus was 1,684 compiled JavaScript and TypeScript files (13 MB) copied from this repository's `node_modules`: ESLint 9 and 10, typescript-eslint 8.72, semver, minimatch, espree, acorn, and esquery.
 
-So code path analysis adds about 0.2 s to this corpus, or about 20% of this plugin's runtime. In ESLint, 4 runs of `Linter#verify` over the JavaScript files took 2,241 to 2,556 ms with the plugin alone and 2,243 to 2,303 ms with the code path rule added, so there is no measurable difference.
+`perf/plugin.mjs` defines three probe rules:
 
-[../eslint-plugin-arrow/type-safety.md](../eslint-plugin-arrow/type-safety.md#9-functions-that-only-throw) records the decision this measurement supports.
+<!-- eslint-skip -->
+```js
+const plain = { create: () => ({ FunctionDeclaration() {} }) }
+const empty = { create: () => ({ FunctionDeclaration() {}, onCodePathEnd() {} }) }
+const paths = { create: () => ({ FunctionDeclaration() {}, onCodePathEnd(codePath, node) { if (node.type === 'FunctionDeclaration' && codePath.returnedSegments.every(s => !s.reachable)) {} } }) }
+export default { meta: { name: 'perf' }, rules: { plain, empty, paths } }
+```
+
+`perf/arrow.mjs` re-exports the built plugin from `dist/`. Each config enables only the listed rules, for example:
+
+```json
+{
+    "jsPlugins": [
+        "./arrow.mjs",
+        "./plugin.mjs"
+    ],
+    "categories": {
+        "correctness": "off"
+    },
+    "plugins": [],
+    "rules": {
+        "arrow/prefer-arrow-functions": "error",
+        "perf/empty": "error"
+    }
+}
+```
+
+Each of the six configs ran 10 times, alternating, from the corpus's parent directory with `oxlint -c perf/<config>.json --threads 1 corpus`. Oxlint rejects a lint path that contains `..` with `PATH must not contain ".."` and exits in about 0.07 s, so a run that fast is an error, not a result.
+
+### Results
+
+| Rules | Median (s) | Min (s) | Max (s) |
+| --- | --- | --- | --- |
+| `perf/plain` | 0.60 | 0.58 | 0.76 |
+| `perf/empty` | 0.90 | 0.83 | 1.19 |
+| `perf/paths` | 0.86 | 0.83 | 1.35 |
+| `arrow/prefer-arrow-functions` | 1.02 | 0.95 | 1.28 |
+| `arrow/prefer-arrow-functions` and `perf/empty` | 1.32 | 1.23 | 1.63 |
+| `arrow/prefer-arrow-functions` and `perf/paths` | 1.34 | 1.22 | 1.52 |
+
+In ESLint, 4 runs of `Linter#verify` over the JavaScript files took 2,241 to 2,556 ms with the plugin alone and 2,243 to 2,303 ms with `perf/paths` added.
+
+[../eslint-plugin-arrow/type-safety.md](../eslint-plugin-arrow/type-safety.md#rejected-code-path-analysis) records the decision this measurement supports.

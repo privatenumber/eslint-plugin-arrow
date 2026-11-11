@@ -183,6 +183,14 @@ describe('prefer-arrow-functions', () => {
 				name: 'function toString / nested in a class',
 				code: 'class A { b(){ c(function(){}) } }\nA.toString()',
 			},
+			{
+				name: 'function toString / nested in a class that reads its own source',
+				code: 'class A { static { A.toString() } b(){ c(function(){}) } }',
+			},
+			{
+				name: 'function toString / nested in a class that reads its own source through an alias',
+				code: 'class A { static { const d = A; d.toString() } b(){ c(function(){}) } }',
+			},
 
 			// Ignores generators
 			{

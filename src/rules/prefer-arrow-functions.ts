@@ -1041,12 +1041,12 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 				}
 				site = site.next;
 			}
+			// A class declaration has two own-name bindings: one outside and one inside its body
 			if ('id' in node && node.id) {
-				const variable = context.sourceCode.getDeclaredVariables!(node).find(
-					candidate => candidate.identifiers[0] === node.id,
-				);
-				if (variable) {
-					merge(getGroup(variable));
+				for (const variable of context.sourceCode.getDeclaredVariables!(node)) {
+					if (variable.identifiers[0] === node.id) {
+						merge(getGroup(variable));
+					}
 				}
 			}
 			return uses;

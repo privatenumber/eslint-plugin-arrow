@@ -416,14 +416,14 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 			return references;
 		};
 
-		const findVariable = (node: TSESTree.Node, name: string) => {
+		const findVariable = (node: TSESTree.Node, name: string, namespace: 'type' | 'value') => {
 			for (
 				let scope: TSESLint.Scope.Scope | null = context.sourceCode.getScope!(node);
 				scope;
 				scope = scope.upper
 			) {
 				const variable = scope.set.get(name);
-				if (variable) {
+				if (variable && (namespace === 'type' ? variable.isTypeVariable : variable.isValueVariable ?? true)) {
 					return variable;
 				}
 			}
@@ -433,7 +433,7 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 			if (reference.typeName.type !== 'Identifier') {
 				return;
 			}
-			const variable = findVariable(reference, reference.typeName.name);
+			const variable = findVariable(reference, reference.typeName.name, 'type');
 			const declaration = variable?.defs.find(def => def.node.type === 'TSTypeAliasDeclaration')?.node;
 			return declaration?.type === 'TSTypeAliasDeclaration' ? declaration : undefined;
 		};
@@ -452,7 +452,7 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 			if (name.type !== 'Identifier') {
 				return;
 			}
-			return findVariable(query, name.name);
+			return findVariable(query, name.name, 'value');
 		};
 
 		// As a `const`, a signature that reads its own type, directly or through same-file aliases,

@@ -1243,6 +1243,14 @@ describe('prefer-arrow-functions', () => {
 					code: 'const T = 1; type T = typeof f; function f(): T { return f }',
 				},
 				{
+					name: 'own type / type parameter does not shadow value',
+					code: 'export function f<f>(): typeof f { return f }',
+				},
+				{
+					name: 'own type / value parameter does not shadow alias',
+					code: 'type T = typeof f; export function f(T: number): T { return f }',
+				},
+				{
 					name: 'own type / transitive alias',
 					code: 'type T = U; type U = typeof f; function f(): T { return f }',
 				},

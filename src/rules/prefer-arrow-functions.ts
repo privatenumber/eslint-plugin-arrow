@@ -337,20 +337,6 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 	}]) => {
 		const untransformableFunctions = new Set<FunctionNode>();
 		const functionsUsingThis = new Set<FunctionNode>();
-		const evalCallPositions: number[] = [];
-		const evalCallIndex = (position: number) => {
-			let low = 0;
-			let high = evalCallPositions.length;
-			while (low < high) {
-				const middle = Math.floor((low + high) / 2);
-				if (evalCallPositions[middle] < position) {
-					low = middle + 1;
-				} else {
-					high = middle;
-				}
-			}
-			return low;
-		};
 
 		// Class fields shadow the prototype, so these names must stay methods.
 		// They are collected from the whole file, so class methods are reported at `Program:exit`
@@ -945,12 +931,6 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 				return false;
 			}
 
-			// Include parameters and nested functions: eval can read bindings that an arrow would change
-			const evalPosition = evalCallPositions[evalCallIndex(node.range[0])];
-			if (evalPosition !== undefined && evalPosition < node.range[1]) {
-				return false;
-			}
-
 			const references = (
 				node.type === 'FunctionDeclaration'
 					? getDeclarationReferences(node)
@@ -1211,9 +1191,17 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 				) {
 					callee = callee.expression;
 				}
-				if (callee.type === 'Identifier' && callee.name === 'eval') {
-					const position = node.range[0];
-					evalCallPositions.splice(evalCallIndex(position), 0, position);
+				if (callee.type !== 'Identifier' || callee.name !== 'eval') {
+					return;
+				}
+
+				// eval can read bindings that an arrow would change in every enclosing function,
+				// including through parameter defaults. Functions are decided on exit, after this runs
+				let ancestor: TSESTree.Node | undefined = node.parent;
+				for (; ancestor; ancestor = ancestor.parent) {
+					if (ancestor.type === 'FunctionDeclaration' || ancestor.type === 'FunctionExpression') {
+						untransformableFunctions.add(ancestor);
+					}
 				}
 			},
 			ThisExpression: (node) => {

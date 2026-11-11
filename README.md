@@ -89,7 +89,7 @@ Oxlint differs from ESLint in two ways:
 
 `function` looks simple, but it hides a lot of behavior. To know what a function can do, you have to know these rules, and not everyone on your team does.
 
-**A function declaration runs before it's defined.**
+**A function declaration can be called before it's defined.**
 
 <!-- eslint-skip -->
 ```js
@@ -162,12 +162,13 @@ function onClick(event: MouseEvent): void {}
 ES modules and class bodies are always strict. But CommonJS files and classic `<script>`s run in _sloppy mode_ unless they start with `'use strict'`. In sloppy mode:
 
 - **`this` becomes `globalThis`.** The detached `get()` above doesn't throw. It silently reads `globalThis.count`. A primitive passed as `this` is wrapped in an object, so `f.call(1)` sees `typeof this === 'object'`.
-- **`arguments` is linked to the parameters.** In `function f(x) { arguments[0] = 9; return x }`, the call `f(1)` returns `9`. This applies when the parameters have no defaults, rest, or destructuring.
+- **`arguments` is linked to the parameters.** In `function f(x) { arguments[0] = 9; return x }`, the call `f(1)` returns `9`. This applies when the parameters have no defaults, rest, destructuring, or repeated names.
 - **A function can see its caller.** `f.caller` can return the function that called `f`. With simple parameters, `arguments.callee` returns `f` itself.
 - **Assigning to a named function expression's own name fails silently.** Inside `(function f() { f = 1 })`, `f` is still the function after the assignment. Strict mode throws.
 - **Parameter names can repeat**, as in `function f(a, a) {}`.
 - **Declarations in a block can be visible outside the block.**
-- **Top-level declarations in a classic script become globals**, such as `window.f`.
+
+Strict mode doesn't fix everything. In any classic script, top-level declarations become globals, such as `window.f`.
 
 </details>
 
@@ -179,7 +180,7 @@ There's less to know and less to rule out. That makes code easier to review, and
 
 | `function` | `const` arrow function |
 | --- | --- |
-| A declaration runs before its definition | Calling it before its line runs throws a `ReferenceError`. [`no-function-hoisting`](./docs/rules/no-function-hoisting.md) moves definitions above their first use where it can, so the file reads from top to bottom. |
+| A declaration can be called before its definition | Calling it before its line runs throws a `ReferenceError`. [`no-function-hoisting`](./docs/rules/no-function-hoisting.md) moves definitions above their first use where it can, so the file reads from top to bottom. |
 | `this` depends on the caller | `this` comes from the code around it, and `call`, `apply`, and `bind` can't change it |
 | Has its own `arguments` | Uses the `arguments` of the enclosing `function`, if there is one |
 | Works with `new` | Throws a `TypeError` |
@@ -237,7 +238,7 @@ const b: () => never = () => { throw new Error() } // Code after a call is unrea
 Even a function that needs nothing from `function` can behave a little differently as an arrow function:
 
 - **Inferred types can differ.** A function that only throws is inferred as returning `void` as a declaration, and `never` as an arrow function.
-- **Published types change form.** An exported `const` arrow function appears in `.d.ts` output as `declare const parse: (input: string) => number` instead of `declare function parse(input: string): number`.
+- **Published types change form.** An exported `const` arrow function appears in `.d.ts` output as `export declare const parse: (input: string) => number` instead of `export declare function parse(input: string): number`.
 - **Import cycles can break.** In an import cycle, another module can call a function declaration before its file has run. The same call to a `const` throws a `ReferenceError`.
 - **A class field isn't a method.** `m = () => {}` creates a new function on every instance, instead of one shared on the prototype. So `super.m()` can't reach it, and the browser never calls a custom element's `connectedCallback` if it's a field.
 
@@ -245,7 +246,7 @@ Even a function that needs nothing from `function` can behave a little different
 
 | Rule | Description |
 | --- | --- |
-| [`prefer-arrow-functions`](./docs/rules/prefer-arrow-functions.md) | Converts `function` declarations, expressions, and methods to arrow functions, and leaves functions that need what `function` adds |
+| [`prefer-arrow-functions`](./docs/rules/prefer-arrow-functions.md) | Converts `function` declarations, expressions, and methods to arrow functions, and leaves functions it detects need what `function` adds |
 | [`no-function-hoisting`](./docs/rules/no-function-hoisting.md) | Moves function declarations above their first use |
 
 The two rules work as a pair. `prefer-arrow-functions` skips any function used before its declaration, because a `const` arrow function can't be called before its line runs. `no-function-hoisting` moves those declarations up first, so `prefer-arrow-functions` can then convert them.

@@ -1215,6 +1215,79 @@ describe('prefer-arrow-functions', () => {
 		});
 	});
 
+	describe('own type query', () => {
+		ruleTester.run('prefer-arrow-functions', preferArrowFunctions, {
+			valid: [
+				{
+					name: 'own type / return',
+					code: 'function f(): typeof f { return f }',
+				},
+				{
+					name: 'own type / parameter',
+					code: 'function f(cb?: typeof f) { return 1 }',
+				},
+				{
+					name: 'own type / type parameter',
+					code: 'function f<T extends typeof f>(x: T) { return 1 }',
+				},
+				{
+					name: 'own type / qualified',
+					code: 'function f(): typeof f.length { return 1 }',
+				},
+				{
+					name: 'own type / alias',
+					code: 'type T = typeof f; function f(): T { return f }',
+				},
+				{
+					name: 'own type / alias sharing a value name',
+					code: 'const T = 1; type T = typeof f; function f(): T { return f }',
+				},
+				{
+					name: 'own type / type parameter does not shadow value',
+					code: 'export function f<f>(): typeof f { return f }',
+				},
+				{
+					name: 'own type / value parameter does not shadow alias',
+					code: 'type T = typeof f; export function f(T: number): T { return f }',
+				},
+				{
+					name: 'own type / transitive alias',
+					code: 'type T = U; type U = typeof f; function f(): T { return f }',
+				},
+				{
+					name: 'own type / cyclic aliases',
+					code: 'type T = U; type U = T | typeof f; function f(): T { return f }',
+				},
+			],
+			invalid: [
+				{
+					name: 'own type / another function',
+					code: 'declare function g(): void; function f(): typeof g { return g }',
+					output: 'declare function g(): void; const f = (): typeof g => { return g }',
+					errors: [{ messageId: 'preferArrowFunction' }],
+				},
+				{
+					name: 'own type / unrelated alias',
+					code: 'type T = number; function f(): T { return 1 }',
+					output: 'type T = number; const f = (): T => { return 1 }',
+					errors: [{ messageId: 'preferArrowFunction' }],
+				},
+				{
+					name: 'own type / shadowed parameter',
+					code: 'function f(f: number, cb: typeof f) { return cb }',
+					output: 'const f = (f: number, cb: typeof f) => { return cb }',
+					errors: [{ messageId: 'preferArrowFunction' }],
+				},
+				{
+					name: 'own type / alias cycle',
+					code: 'type T = U; type U = T; function f(): T { return 1 }',
+					output: 'type T = U; type U = T; const f = (): T => { return 1 }',
+					errors: [{ messageId: 'preferArrowFunction' }],
+				},
+			],
+		});
+	});
+
 	describe('classMethods', () => {
 		const options = [{ classMethods: true }] as const;
 

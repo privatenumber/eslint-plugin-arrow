@@ -299,6 +299,7 @@ These count when read through the function's variable, such as `fn.name`, or dir
 - [`this` parameters](https://www.typescriptlang.org/docs/handbook/2/functions.html#declaring-this-in-a-function)
 - [Assertion functions](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-3-7.html#assertion-functions) (`asserts value`) and `never` return types. TypeScript only uses them to narrow types and detect unreachable code when the function is a declaration or a variable with an explicit function type, and a converted `const` has no type annotation.
 - Function declarations whose parameter, return, or type parameter types use `typeof value`, when `value` has no type annotation and its initializer uses the function. As a `const`, the function's type and the value's inferred type depend on each other, and TypeScript can report `TS7022`.
+- Function declarations whose signature reads their own type with `typeof`, directly or through same-file type aliases. As a `const`, the type depends on itself and TypeScript can report `TS7022`. Imported aliases, interfaces, and aliases or queries reached through a namespace, such as `N.T` or `typeof N.f`, are not followed, and neither are aliases declared in `declare global`.
 
 
 ### Code the rule cannot check

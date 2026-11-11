@@ -129,7 +129,7 @@ Issue [#7](https://github.com/privatenumber/eslint-plugin-arrow/issues/7). The r
 
 **Decision**, shipping with the PR that closes #7: apply the constructor and property checks to every variable the function's value can flow into by simple assignment. The rule groups such variables into alias groups, once per file and only when a function needs them. Two variables are in the same group when one is assigned to the other by a declarator initializer or an assignment, including each target of a chained `a = b = F`. The value can pass through:
 
-- a TypeScript wrapper: `as`, `satisfies`, `!`, or `<T>`
+- a TypeScript wrapper: `as`, `satisfies`, `!`, `<T>`, or an instantiation expression such as `F<T>`
 - a branch of a conditional expression
 - an operand of `&&`, `||`, or `??`
 - parentheses around a function expression
@@ -156,13 +156,15 @@ Not followed, and documented as limits: objects and arrays (`{ A }`, `[A]`), des
 
 Issue [#11](https://github.com/privatenumber/eslint-plugin-arrow/issues/11). The rule finds uses of `this`, `arguments`, `new.target`, and `super` through scope analysis, which cannot see inside a string. `function f(a) { return eval('arguments[0]') }` converted, and the arrow function threw `ReferenceError` in a module. In CommonJS it read the module wrapper's `arguments` instead, so `f(42)` returned the `exports` object.
 
-**Decision**, shipping with the PR that closes #11: skip a function when it contains a call whose callee is the identifier `eval`, in its body or its parameter defaults,, after removing parentheses and the TypeScript wrappers `as`, `satisfies`, `!`, and `<T>`. The check is syntactic and does not look at what `eval` resolves to. It covers three cases that a check of unresolved references misses:
+**Decision**, shipping with the PR that closes #11: skip a function when it contains a call whose callee is the identifier `eval`, in its body or its parameter defaults,, after removing parentheses and the TypeScript wrappers `as`, `satisfies`, `!`, `<T>`, and instantiation expressions such as `eval<T>`. The check is syntactic and does not look at what `eval` resolves to. It covers three cases that a check of unresolved references misses:
 
 - A local binding can hold the real `eval`. In sloppy mode, `function f(eval, a) { return eval('arguments[1]') }` called as `f(globalThis.eval, 42)` is a direct eval and returns `42`.
 - TypeScript removes its wrappers, so `eval!(code)` and `(eval as any)(code)` emit a direct `eval(code)`.
 - Optional calls count. `eval?.(code)` is indirect in JavaScript, but TypeScript 6.0.3 with a target below ES2020 emits `eval === null || eval === void 0 ? void 0 : eval(code)`, which ends in a direct call.
 
 Parameter defaults run in the function's scope, so `function f(a = eval('arguments[1]'))` reads `f`'s own `arguments`. `(0, eval)(code)` and `globalThis.eval(code)` do not count, because no emit makes them direct. A call inside a nested function also counts. That is exact for a nested arrow function and conservative for a nested `function`, which the rule accepts because direct `eval` is rare.
+
+The skip protects only the function that contains the call. Evaluated code can also call another function in scope, or read a `super` member, and the rule still converts that function: in `function a() { const x = eval('b()'); function b() {} return x }`, the converted `const b` is not initialized when `eval` runs. With `classMethods`, keeping an overriding method that calls `eval` while converting the method it overrides lets the field shadow it. That is the documented override limit of `classMethods`, which every other reason for keeping a method shares, so the rule does not match methods across classes for `eval` alone.
 
 ## Checked and unchanged
 

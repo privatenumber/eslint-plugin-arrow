@@ -167,6 +167,18 @@ ES modules and class bodies are always strict. But CommonJS files and classic `<
 
 </details>
 
+<details>
+<summary><strong>Want more?</strong> A few more things <code>function</code> and methods can do.</summary>
+
+- **It can tell how it was called.** `new.target` is `undefined` in a normal call, and the constructor in a `new` call.
+- **A named function expression has a private name.** In `const fact = function self(n) { return n ? n * self(n - 1) : 1 }`, `self` works inside the function and doesn't exist outside it.
+- **It works before its module finishes loading.** In an import cycle, another module can call a function declaration before its file has run. The same call to a `const` throws `Cannot access 'helper' before initialization`.
+- **Object methods have `super`.** With `{ __proto__: base, hi() { return super.hi() } }`, `super` reads from the object's prototype, not only in classes.
+- **`__proto__` means two different things.** `{ __proto__() {} }` defines a method. `{ __proto__: fn }` sets the object's prototype.
+- **Its source is readable.** `f.toString()` returns the exact source text, and some libraries read parameter names from it.
+
+</details>
+
 ### Enter arrow functions
 
 Arrow functions solve all of it. An arrow function in a `const` has none of these hidden rules. It runs its body when you call it, and that's it.
@@ -198,13 +210,38 @@ Some TypeScript features only work on a function declaration, or need extra type
 
 | Feature | Example | As a `const` arrow function |
 | --- | --- | --- |
-| Overloads | `function f(v: string): string` | Needs an overloaded function type on the variable |
+| Overloads | `function f(v: string): string` | Works with an overloaded function type on the variable, but one implementation has to satisfy every signature |
 | `this` parameter | `function f(this: Window) {}` | Not supported (TS2730) |
 | Assertion function | `function assert(v: unknown): asserts v {}` | Needs an explicit function type on the variable, or the call stops narrowing (TS2775) |
 | `never` return type | `function fail(): never { throw error }` | Needs an explicit function type on the variable, or code after the call stops being unreachable |
 | Namespace merging | `function f() {}` with `namespace f { export const x = 1 }` | Not supported (TS2451) |
 
 `prefer-arrow-functions` keeps these TypeScript functions as `function`, because its autofix doesn't add type annotations. It also only sees the current file and the types written in it. Its [limitations](./docs/rules/prefer-arrow-functions.md#limitations) list the cases it keeps, and [Code the rule cannot check](./docs/rules/prefer-arrow-functions.md#code-the-rule-cannot-check) lists type changes it can miss, such as inferred return types.
+
+**Overloads work on arrow functions too.** Give the variable a type with several signatures. The catch is that one implementation has to satisfy all of them:
+
+<!-- eslint-skip -->
+```ts
+type F = {
+    (v: string): string
+    (v: number): number
+}
+
+const a: F = (v) => v // TS2322: returns string | number
+const b: F = <T,>(v: T) => v // Works: the return type follows the input
+```
+
+**`never` has to go on the variable.** TypeScript only uses it for control flow when the name has an explicit type. The same goes for assertion functions:
+
+<!-- eslint-skip -->
+```ts
+const a = (): never => { throw error } // Code after a call still counts as reachable
+const b: () => never = () => { throw error } // Code after a call is unreachable
+```
+
+**Inferred types can differ.** A function that only throws is inferred as returning `void` as a declaration, and `never` as an arrow function.
+
+**A class method isn't the same as an arrow function field.** `m = () => {}` creates a new function on every instance, instead of one shared on the prototype. So `super.m()` can't reach it, and the browser never calls a custom element's `connectedCallback` if it's a field.
 
 **Published types change form.** An exported `const` arrow function appears in `.d.ts` output as `declare const parse: (input: string) => number` instead of `declare function parse(input: string): number`.
 

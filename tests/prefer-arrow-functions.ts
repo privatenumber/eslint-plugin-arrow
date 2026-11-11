@@ -2113,4 +2113,96 @@ describe('prefer-arrow-functions', () => {
 			eslintRuleTester.run('prefer-arrow-functions', preferArrowFunctions as unknown as Rule.RuleModule, cases);
 		});
 	});
+
+	describe('direct eval', () => {
+		const errors = [{ messageId: 'preferArrowFunction' as const }];
+		const cases = {
+			valid: [
+				{
+					name: 'declaration / arguments',
+					code: "function a(b){ return eval('arguments[0]') }",
+				},
+				{
+					name: 'expression / this',
+					code: "const a = function(){ return eval('this') }",
+				},
+				{
+					name: 'object method / super',
+					code: "({ a(){ return eval('super.x') } })",
+					options: [{ objectMethods: true }] as [{ objectMethods: boolean }],
+				},
+				{
+					name: 'nested arrow',
+					code: "function a(){ return () => eval('arguments[0]') }",
+				},
+				{
+					name: 'nested function',
+					code: "function a(){ function b(){ return eval('arguments[0]') } return b() }",
+				},
+				{
+					name: 'parenthesized callee',
+					code: "function a(){ return (eval)('arguments[0]') }",
+				},
+				{
+					name: 'optional call',
+					code: "function a(){ return eval?.('1') }",
+				},
+				{
+					name: 'eval in a parameter default',
+					code: "function a(b = eval('arguments[1]')){ return b }",
+				},
+				{
+					name: 'local eval binding',
+					code: "function a(eval, b){ return eval('arguments[1]') }",
+					languageOptions: {
+						sourceType: 'commonjs',
+						parserOptions: { sourceType: 'commonjs' },
+					} as const,
+				},
+				{
+					name: 'class method with eval before a later eval call',
+					code: "class A { a(){ return eval('1') } } eval('2')",
+					options: [{ classMethods: true }] as [{ classMethods: boolean }],
+				},
+			],
+			invalid: [
+				{
+					name: 'indirect / sequence',
+					code: "function a(){ return (0, eval)('1') }",
+					errors,
+					output: "const a = () => { return (0, eval)('1') }",
+				},
+				{
+					name: 'indirect / member',
+					code: "function a(){ return globalThis.eval('1') }",
+					errors,
+					output: "const a = () => { return globalThis.eval('1') }",
+				},
+				{
+					name: 'eval outside the function',
+					code: "eval('1'); function a(b){ return b }",
+					errors,
+					output: "eval('1'); const a = (b) => { return b }",
+				},
+			],
+		};
+
+		describe('typescript parser', () => {
+			ruleTester.run('prefer-arrow-functions', preferArrowFunctions, cases);
+			ruleTester.run('prefer-arrow-functions TS eval wrappers', preferArrowFunctions, {
+				valid: [
+					"function a(){ return eval!('arguments[0]') }",
+					"function a(){ return (eval as any)('arguments[0]') }",
+					"function a(){ return (<any>eval)('arguments[0]') }",
+					"function a(){ return (eval satisfies any)('arguments[0]') }",
+					"function a(){ return ((eval as <T>(s: string) => any)<string>)('arguments[0]') }",
+				],
+				invalid: [],
+			});
+		});
+		describe('javascript parser', () => {
+			const eslintRuleTester = new EslintRuleTester();
+			eslintRuleTester.run('prefer-arrow-functions', preferArrowFunctions as unknown as Rule.RuleModule, cases);
+		});
+	});
 });

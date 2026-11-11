@@ -1224,6 +1224,30 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 		};
 
 		return {
+			CallExpression: (node) => {
+				let { callee } = node;
+				while (
+					callee.type === 'TSAsExpression'
+					|| callee.type === 'TSSatisfiesExpression'
+					|| callee.type === 'TSNonNullExpression'
+					|| callee.type === 'TSTypeAssertion'
+					|| callee.type === 'TSInstantiationExpression'
+				) {
+					callee = callee.expression;
+				}
+				if (callee.type !== 'Identifier' || callee.name !== 'eval') {
+					return;
+				}
+
+				// eval can read bindings that an arrow would change in every enclosing function,
+				// including through parameter defaults. Functions are decided on exit, after this runs
+				let ancestor: TSESTree.Node | undefined = node.parent;
+				for (; ancestor; ancestor = ancestor.parent) {
+					if (ancestor.type === 'FunctionDeclaration' || ancestor.type === 'FunctionExpression') {
+						untransformableFunctions.add(ancestor);
+					}
+				}
+			},
 			ThisExpression: (node) => {
 				const functionNode = getNearestFunction(node);
 				if (functionNode) {

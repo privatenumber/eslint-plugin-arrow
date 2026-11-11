@@ -26,7 +26,7 @@ The test found two errors when it was added: the `export default` split added a 
 
 ## README teaching examples
 
-The README's "Did you know?" section and its "Enter arrow functions", "When you still need `function`", and "What changes when you switch" subsections explain what `function` adds before the README introduces the rules. Their snippets have no `// ❌` or `// ✅` label, because they show language behavior, not rule output, so the docs test does not check them. Snippets that would fail the docs lint use `<!-- eslint-skip -->`. The `Handler` example is linted and only produces unused-variable warnings.
+The README's "Did you know?" section and its "Enter arrow functions", "When you still need `function`", and "What changes when you switch" subsections explain what `function` adds before the README introduces the rules. Their snippets have no `// ❌` or `// ✅` label, because they show language behavior, not rule output, so the docs test does not check them. They also use `<!-- eslint-skip -->`, so the docs lint does not check them either.
 
 Each result in a comment was observed on 2026-11-10:
 

@@ -89,7 +89,7 @@ Oxlint differs from ESLint in two ways:
 
 `function` looks simple, but it hides a lot of behavior. To know what a function can do, you have to know these rules, and not everyone on your team does.
 
-**It runs before it's defined.**
+**A function declaration runs before it's defined.**
 
 <!-- eslint-skip -->
 ```js
@@ -111,7 +111,7 @@ const counter = {
 counter.get() // 0
 
 const get = counter.get
-get() // TypeError: Cannot read properties of undefined (reading 'count')
+get() // In strict mode: TypeError: Cannot read properties of undefined (reading 'count')
 ```
 
 It's the same function, called two ways. `call`, `apply`, and `bind` can also set `this` to anything.
@@ -134,7 +134,7 @@ new greet() // greet {}, even if it was never meant to be a constructor
 
 It also gets a `prototype` object, which `instanceof` and `class extends` rely on. Inside the function, `new.target` tells it whether it was called with `new`.
 
-**It can be silently replaced.**
+**A function declaration can be silently replaced.**
 
 <!-- eslint-skip -->
 ```js
@@ -179,11 +179,11 @@ There's less to know and less to rule out. That makes code easier to review, and
 
 | `function` | `const` arrow function |
 | --- | --- |
-| Runs before its definition | Calling it before its line runs throws a `ReferenceError`. [`no-function-hoisting`](./docs/rules/no-function-hoisting.md) moves definitions above their first use, so the file reads from top to bottom. |
+| A declaration runs before its definition | Calling it before its line runs throws a `ReferenceError`. [`no-function-hoisting`](./docs/rules/no-function-hoisting.md) moves definitions above their first use where it can, so the file reads from top to bottom. |
 | `this` depends on the caller | `this` comes from the code around it, and `call`, `apply`, and `bind` can't change it |
 | Has its own `arguments` | Uses the `arguments` of the enclosing `function`, if there is one |
 | Works with `new` | Throws a `TypeError` |
-| Can be silently replaced | Assignment throws a `TypeError`, and a second declaration is a syntax error |
+| A declaration can be silently replaced | Assignment throws a `TypeError`, and a second declaration is a syntax error |
 | Can't take a function type | `const onClick: Handler = (event) => {}` types `event` from `Handler` |
 
 This holds in both strict and sloppy mode: an arrow function never has its own `this` or `arguments`, and never allows repeated parameter names.
@@ -208,7 +208,7 @@ Some TypeScript features only work on a function declaration, or need extra type
 | Overloads | `function f(v: string): string` | Needs an overloaded function type on the variable |
 | `this` parameter | `function f(this: Window) {}` | Not supported (TS2730) |
 | Assertion function | `function assert(v: unknown): asserts v {}` | Needs a function type on the variable (TS2775 without one) |
-| `never` return type | `function fail(): never { throw error }` | Needs a function type on the variable |
+| `never` return type | `function fail(): never { throw new Error() }` | Needs a function type on the variable |
 | Namespace merging | `function f() {}` with `namespace f { export const x = 1 }` | Not supported (TS2451) |
 
 **Overloads work on arrow functions too.** Give the variable a type with several signatures. The catch is that one implementation has to satisfy all of them:
@@ -228,8 +228,8 @@ const b: F = <T,>(v: T) => v // Works: the return type follows the input
 
 <!-- eslint-skip -->
 ```ts
-const a = (): never => { throw error } // Code after a call still counts as reachable
-const b: () => never = () => { throw error } // Code after a call is unreachable
+const a = (): never => { throw new Error() } // Code after a call still counts as reachable
+const b: () => never = () => { throw new Error() } // Code after a call is unreachable
 ```
 
 ### What changes when you switch
@@ -252,7 +252,7 @@ The two rules work as a pair. `prefer-arrow-functions` skips any function used b
 
 Each rule also works on its own. For example, use `no-function-hoisting` alone if you want to keep `function` declarations, but still require them to be declared before use.
 
-`prefer-arrow-functions` keeps a function when a direct conversion would break it, including the TypeScript features above. It only sees the current file and the types written in it, so [Code the rule cannot check](./docs/rules/prefer-arrow-functions.md#code-the-rule-cannot-check) lists what it can miss, such as inferred return types and import cycles. Each rule's docs list the functions it keeps and its limitations.
+`prefer-arrow-functions` keeps a function when it detects that a direct conversion would break it, including the TypeScript features above. It only sees direct uses in the current file and the types written there, so [Code the rule cannot check](./docs/rules/prefer-arrow-functions.md#code-the-rule-cannot-check) lists what it can miss, such as indirect uses, inferred return types, and import cycles. Each rule's docs list the functions it keeps and its limitations.
 
 ## Related built-in rules
 

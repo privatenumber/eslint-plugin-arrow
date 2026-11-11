@@ -69,13 +69,13 @@ Cost, measured on the [corpus](#corpus): 106 of 4,910 named function declaration
 
 ## #9: functions that only throw
 
-**Decision:** skip a function declaration, or a class method under `classMethods`, that has no return type annotation and no `return` statement, and whose last statement cannot complete normally. The check is syntactic:
+**Decision:** skip a function declaration, or a class method under `classMethods`, that has no return type annotation and no `return` statement, and whose body cannot complete normally. The check is syntactic:
 
 - `throw` cannot complete.
-- A block cannot complete when its last statement cannot.
+- A block, including the function body, cannot complete when any of its statements cannot, because the statements after it are unreachable. `break` and `continue` only occur inside loops, `switch`, and labeled statements, which count as completing, so they cannot make an earlier statement complete.
 - `if` cannot complete when it has an `else` and neither branch can.
 - `try` cannot complete when its `finally` cannot, or when its block cannot and its `catch`, if any, cannot.
-- `if` with the literal test `true` cannot complete when its consequent cannot, and with `false`, when its `else` cannot. TypeScript 6.0.3 treats these tests as constant: `function f() { if (true) throw e }` infers `void` and its arrow function infers `never`. Other constant tests, such as `if (1)`, infer `void` in both forms.
+- `if` with the literal test `true` cannot complete when its consequent cannot, and with `false`, when its `else` cannot. TypeScript 6.0.3 treats these tests as constant: `function f() { if (true) throw e }` infers `void` and its arrow function infers `never`. Other constant tests, such as `if (1)`, infer `void` in both forms. Tests that TypeScript narrows to `true`, such as `x || true`, are a limit.
 
 `async` functions are included, because `Promise<void>` changes to `Promise<never>`. Function expressions and object methods already infer `never`, so they do not need the skip.
 

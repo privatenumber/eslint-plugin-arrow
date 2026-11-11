@@ -1958,6 +1958,7 @@ describe('prefer-arrow-functions', () => {
 					"function a(){ return (eval as any)('arguments[0]') }",
 					"function a(){ return (<any>eval)('arguments[0]') }",
 					"function a(){ return (eval satisfies any)('arguments[0]') }",
+					"function a(){ return ((eval as <T>(s: string) => any)<string>)('arguments[0]') }",
 				],
 				invalid: [],
 			});

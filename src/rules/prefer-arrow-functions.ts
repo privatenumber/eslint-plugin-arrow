@@ -1207,6 +1207,7 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 					|| callee.type === 'TSSatisfiesExpression'
 					|| callee.type === 'TSNonNullExpression'
 					|| callee.type === 'TSTypeAssertion'
+					|| callee.type === 'TSInstantiationExpression'
 				) {
 					callee = callee.expression;
 				}

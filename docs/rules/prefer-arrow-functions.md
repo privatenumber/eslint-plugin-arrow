@@ -270,7 +270,7 @@ This rule will not generate warnings or fixes for traditional functions that use
 - [`function*`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/function*)
 - [`new.target`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/new.target)
 - [`super`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/super)
-- A call to an identifier named `eval` in the function, including its parameter defaults, nested functions, optional calls, and calls wrapped in parentheses or TypeScript expressions. The rule cannot see what the evaluated code uses, and TypeScript can emit optional calls as direct calls
+- A call to an identifier named `eval` in the function, including its parameter defaults, nested functions, optional calls, and calls wrapped in parentheses or TypeScript expressions. The rule cannot see what the evaluated code uses, and TypeScript can emit optional calls as direct calls. The evaluated code can also call other functions in scope or read `super` members, and the rule still converts those functions, so `eval('b()')` throws if it runs before a converted `const b`
 
 ### Function properties
 - [`name`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/name)

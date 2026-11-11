@@ -910,7 +910,8 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 			}
 
 			// A non-completing declaration or class method without a return type annotation or own return
-			// infers `void` (`Promise<void>` if async), but an arrow infers `never` (`Promise<never>`)
+			// infers `void` (`Promise<void>` if async), but an arrow infers `never` (`Promise<never>`).
+			// A JSDoc `@returns` type prevents this. The rule does not read JSDoc, so it skips those too
 			if (
 				(node.type === 'FunctionDeclaration' || parent.type === 'MethodDefinition')
 				&& !node.returnType

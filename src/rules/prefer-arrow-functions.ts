@@ -429,6 +429,43 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 			}
 		};
 
+		// TypeScript reads `@this` from the last JSDoc comment on these hosts only
+		const hasThisTag = (node: FunctionNode) => {
+			const { parent } = node;
+			let host: TSESTree.Node | undefined;
+			if (node.type === 'FunctionDeclaration') {
+				host = node;
+			} else if (parent.type === 'MethodDefinition') {
+				host = parent;
+			} else if (
+				parent.type === 'VariableDeclarator'
+				&& parent.init === node
+				&& parent.parent.type === 'VariableDeclaration'
+				&& parent.parent.declarations.length === 1
+			) {
+				host = parent.parent;
+			} else if (
+				parent.type === 'AssignmentExpression'
+				&& parent.right === node
+				&& parent.parent.type === 'ExpressionStatement'
+			) {
+				host = parent.parent;
+			}
+			if (!host) {
+				return false;
+			}
+			if (
+				host.parent?.type === 'ExportNamedDeclaration'
+				|| host.parent?.type === 'ExportDefaultDeclaration'
+			) {
+				host = host.parent;
+			}
+			const comment = context.sourceCode.getCommentsBefore(host).findLast(
+				entry => entry.type === 'Block' && entry.value.startsWith('*'),
+			);
+			return comment !== undefined && /@this\b/u.test(comment.value);
+		};
+
 		const resolveTypeAlias = (reference: TSESTree.TSTypeReference) => {
 			if (reference.typeName.type !== 'Identifier') {
 				return;
@@ -856,6 +893,10 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 			// Arrow functions cannot declare a TypeScript `this` parameter
 			const [firstParameter] = node.params;
 			if (firstParameter?.type === 'Identifier' && firstParameter.name === 'this') {
+				return false;
+			}
+			// In checked JavaScript, JSDoc `@this` becomes a disallowed arrow function parameter
+			if (hasThisTag(node)) {
 				return false;
 			}
 

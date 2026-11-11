@@ -372,6 +372,12 @@ log(Example.prototype.read.call({}));`,
 		changes: changesInAll(false),
 	},
 	{
+		name: 'constructor through alias',
+		sourceType: 'module',
+		code: 'function A() { return { value: 1 } }\nconst B = A;\nlog(new B().value);',
+		changes: changesInAll(false),
+	},
+	{
 		name: 'new.target',
 		sourceType: 'module',
 		code: `function Target() {

@@ -278,12 +278,14 @@ This rule will not generate warnings or fixes for traditional functions that use
 - [`arguments`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/arguments), which differs only for sloppy-mode functions
 - [`toString()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/toString), which returns the source text. Functions nested inside a function or class whose source is read are kept too.
 
-These count when read through the function's variable, such as `fn.name`, or directly on the function, such as `function foo() {}.name`.
+These count when read through the function's variable or a simple alias, such as `const alias = fn; alias.name`, or directly on the function, such as `function foo() {}.name`.
 
 ### Constructor usage
 - [`new`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/new)
 - [`instanceof`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/instanceof)
 - [`extends`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Classes/extends)
+
+These uses also count through simple aliases, such as `const alias = fn; new alias()`.
 
 ### Declaration style
 - [Hoisting](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/function#hoisting): any use before the declaration, except in an `export { name }` list, which never reads the value
@@ -313,7 +315,7 @@ These count when read through the function's variable, such as `fn.name`, or dir
 
 - **Uses in other files.** Another file can read a converted function's `.name`, `.prototype`, `.caller`, or `.arguments`, or call it with `new`. List those functions in [`allowedNames`](#allowednames).
 - **Import cycles.** In an import cycle, another module can call an exported function before its own module finishes running. A function declaration already works at that point, but a `const` arrow function does not exist yet, so the call throws. This also applies to any converted helper that the exported function calls. Bundling does not prevent it. Disable the rule for modules that other modules in a cycle call while they load.
-- **Indirect uses.** The rule checks direct uses of a function's name. It doesn't follow a function through another variable, so `const g = f; new g()` throws after `f` is converted. List those functions in [`allowedNames`](#allowednames).
+- **Indirect uses.** The rule does not follow functions through objects, arrays, destructuring, function arguments or returns, or compound assignments. For example, `const o = { f }; new o.f()` throws after `f` is converted. List those functions in [`allowedNames`](#allowednames).
 - **Code that reads a function's source.** Converting a function changes its source text, which `fn.toString()` returns. Code that reads a function's source breaks, for example to run it in another context, or to read its parameter names for dependency injection, as `async.autoInject()` does.
 - **Inferred return types.** The rule does not detect functions that cannot complete because of loops, exhaustive `switch` statements, labeled statements, or calls to functions returning `never`. It only treats the literal tests `true` and `false` as constant, not expressions such as `if (x || true) throw e`. Converting one can change its inferred return type from `void` to `never` (or `Promise<void>` to `Promise<never>` if async), which changes its `.d.ts` output. Add a return type annotation to keep the type.
 - **Type augmentation in other files.** Another module can add overloads, or a `namespace` that contains values, to an exported function with `declare module`. A `const` can't merge with them, so TypeScript reports `TS2451`. List those functions in [`allowedNames`](#allowednames).

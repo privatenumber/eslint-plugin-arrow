@@ -2076,6 +2076,157 @@ describe('prefer-arrow-functions', () => {
 		});
 	});
 
+	describe('aliases', () => {
+		const errors = [{ messageId: 'preferArrowFunction' as const }];
+		const cases = {
+			valid: [
+				{
+					name: 'aliases / declaration new',
+					code: 'function a(){} const b = a; new b()',
+				},
+				{
+					name: 'aliases / expression new',
+					code: 'const a = function(){}; const b = a; new b()',
+				},
+				{
+					name: 'aliases / assignment',
+					code: 'function a(){} let b; b = a; new b()',
+				},
+				{
+					name: 'aliases / chain',
+					code: 'function a(){} const b = a; const c = b; new c()',
+				},
+				{
+					name: 'aliases / cycle',
+					code: 'function f(){} let a = f; let b = a; a = b; new b()',
+				},
+				{
+					name: 'aliases / instanceof',
+					code: 'function a(){} const b = a; x instanceof b',
+				},
+				{
+					name: 'aliases / extends',
+					code: 'function a(){} const b = a; class c extends b {}',
+				},
+				{
+					name: 'aliases / prototype',
+					code: 'function a(){} const b = a; b.prototype',
+				},
+				{
+					name: 'aliases / toString',
+					code: 'function a(){} const b = a; b.toString()',
+				},
+				{
+					name: 'aliases / nested function source read',
+					code: 'function a(){ return function(){} } const b = a; b.toString()',
+				},
+				{
+					name: 'aliases / conditional consequent',
+					code: 'function a(){} const b = x ? a : y; new b()',
+				},
+				{
+					name: 'aliases / conditional alternate',
+					code: 'function a(){} const b = x ? y : a; new b()',
+				},
+				{
+					name: 'aliases / and',
+					code: 'function a(){} const b = x && a; new b()',
+				},
+				{
+					name: 'aliases / or',
+					code: 'function a(){} const b = a || x; new b()',
+				},
+				{
+					name: 'aliases / nullish',
+					code: 'function a(){} const b = x ?? a; new b()',
+				},
+				{
+					name: 'aliases / nested wrappers',
+					code: 'function a(){} const b = x ? (y || a) : z; new b()',
+				},
+			],
+			invalid: [
+				{
+					name: 'aliases / nested function source not read',
+					code: 'const a = () => { return function(){} }; const b = a; b()',
+					output: 'const a = () => { return () => {} }; const b = a; b()',
+					errors,
+				},
+				{
+					name: 'aliases / called',
+					code: 'function a(){} const b = a; b()',
+					output: 'const a = () => {}; const b = a; b()',
+					errors,
+				},
+				// Object properties are not followed
+				{
+					name: 'aliases / object boundary',
+					code: 'function a(){} const b = { a }; new b.a()',
+					output: 'const a = () => {}; const b = { a }; new b.a()',
+					errors,
+				},
+				{
+					name: 'aliases / shadowing',
+					code: 'function a(){} { const b = a; b() } { const b = x; new b() }',
+					output: 'const a = () => {}; { const b = a; b() } { const b = x; new b() }',
+					errors,
+				},
+				{
+					name: 'aliases / conditional test',
+					code: 'function a(){} const b = a ? x : y; new b()',
+					output: 'const a = () => {}; const b = a ? x : y; new b()',
+					errors,
+				},
+				{
+					name: 'aliases / compound assignment',
+					code: 'function a(){} let b = x; b ||= a; new b()',
+					output: 'const a = () => {}; let b = x; b ||= a; new b()',
+					errors,
+				},
+				{
+					name: 'aliases / reassignment',
+					code: 'function a(){} let b = a; b = x; b()',
+					output: 'const a = () => {}; let b = a; b = x; b()',
+					errors,
+				},
+				{
+					name: 'aliases / cycle without constructor',
+					code: 'function f(){} let a = f; let b = a; a = b; b()',
+					output: 'const f = () => {}; let a = f; let b = a; a = b; b()',
+					errors,
+				},
+			],
+		};
+		describe('typescript parser', () => {
+			ruleTester.run('prefer-arrow-functions', preferArrowFunctions, cases);
+			ruleTester.run('typescript alias wrappers', preferArrowFunctions, {
+				valid: [
+					{
+						name: 'aliases / as',
+						code: 'function a(){} const b = a as typeof a; new b()',
+					},
+					{
+						name: 'aliases / satisfies',
+						code: 'function a(){} const b = a satisfies typeof a; new b()',
+					},
+					{
+						name: 'aliases / non-null',
+						code: 'function a(){} const b = a!; new b()',
+					},
+					{
+						name: 'aliases / assertion',
+						code: 'function a(){} const b = <typeof a>a; new b()',
+					},
+				],
+				invalid: [],
+			});
+		});
+		describe('javascript parser', () => {
+			const eslintRuleTester = new EslintRuleTester();
+			eslintRuleTester.run('prefer-arrow-functions', preferArrowFunctions as unknown as Rule.RuleModule, cases);
+		});
+	});
+
 	// The TypeScript parser has no function scope around CommonJS code, so both parsers run these.
 	// The TypeScript RuleTester defaults `parserOptions.sourceType` to `module`, which is strict
 	describe('sloppy mode and scripts', () => {

@@ -739,6 +739,72 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 			return references;
 		};
 
+		const isAliasWrapper = (node: TSESTree.Node, parent: TSESTree.Node) => (
+			(parent.type === 'TSAsExpression' && parent.expression === node)
+			|| (parent.type === 'TSSatisfiesExpression' && parent.expression === node)
+			|| (parent.type === 'TSNonNullExpression' && parent.expression === node)
+			|| (parent.type === 'TSTypeAssertion' && parent.expression === node)
+			|| (parent.type === 'ConditionalExpression' && parent.test !== node)
+			|| parent.type === 'LogicalExpression'
+		);
+
+		// Index references once per scope, so resolving many assignment targets stays linear
+		const scopeReferences = new WeakMap<
+			TSESLint.Scope.Scope,
+			Map<TSESLint.Scope.Reference['identifier'], TSESLint.Scope.Reference>
+		>();
+
+		// Follows aliases: identifiers bound to the function directly or through a wrapper. Objects,
+		// arrays, destructuring, and calls are not followed (#10)
+		const someReference = (
+			references: TSESLint.Scope.Reference[],
+			predicate: (reference: TSESLint.Scope.Reference) => boolean,
+		) => {
+			const pending = [...references];
+			const visited = new Set<TSESLint.Scope.Variable>();
+			while (pending.length > 0) {
+				const reference = pending.pop()!;
+				if (predicate(reference)) {
+					return true;
+				}
+
+				let current: TSESTree.Node = reference.identifier;
+				while (isAliasWrapper(current, current.parent!)) {
+					current = current.parent!;
+				}
+				const parent = current.parent!;
+				let variable: TSESLint.Scope.Variable | undefined;
+				if (
+					parent.type === 'VariableDeclarator'
+					&& parent.init === current
+					&& parent.id.type === 'Identifier'
+				) {
+					[variable] = context.sourceCode.getDeclaredVariables!(parent);
+				} else if (
+					parent.type === 'AssignmentExpression'
+					&& parent.operator === '='
+					&& parent.right === current
+					&& parent.left.type === 'Identifier'
+				) {
+					const target = parent.left;
+					const scope = context.sourceCode.getScope!(target);
+					let indexed = scopeReferences.get(scope);
+					if (!indexed) {
+						indexed = new Map(scope.references.map(candidate => [candidate.identifier, candidate]));
+						scopeReferences.set(scope, indexed);
+					}
+					variable = indexed.get(target)?.resolved ?? undefined;
+				}
+				if (variable && !visited.has(variable)) {
+					visited.add(variable);
+					for (const aliasReference of variable.references) {
+						pending.push(aliasReference);
+					}
+				}
+			}
+			return false;
+		};
+
 		// Preferences from options, as opposed to conversions that would change behavior
 		const isExcludedByOptions = (
 			node: FunctionNode,
@@ -854,7 +920,8 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 				];
 				if (
 					isToStringRead(ancestor)
-					|| variables.some(variable => variable.references.some(
+					|| variables.some(variable => someReference(
+						variable.references,
 						reference => isToStringRead(reference.identifier),
 					))
 				) {
@@ -982,12 +1049,9 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 					: getExpressionReferences(node, scope)
 			);
 
-			return references !== undefined && !references.some(
-				({ identifier }) => (
-					isConstructorReference(identifier)
-					|| isFunctionPropertyReference(identifier)
-				),
-			);
+			return references !== undefined && !someReference(references, ({ identifier }) => (
+				isConstructorReference(identifier) || isFunctionPropertyReference(identifier)
+			));
 		};
 
 		// In TSX, `<T>(` parses as a JSX element unless the type parameter list has a trailing comma

@@ -237,6 +237,24 @@ const classifyUse = (
 	node: TSESTree.Node,
 ): UseFlags => {
 	const { parent } = node;
+	if (
+		parent?.type === 'AssignmentExpression'
+		&& parent.operator === '='
+		&& parent.right === node
+		&& (parent.left.type === 'ObjectPattern' || parent.left.type === 'ArrayPattern')
+	) {
+		let result: TSESTree.Node = parent;
+		while (result.parent && isAliasWrapper(result, result.parent)) {
+			result = result.parent;
+		}
+		if (result.parent?.type !== 'ExpressionStatement') {
+			return {
+				constructed: true,
+				propertyRead: true,
+				sourceRead: true,
+			};
+		}
+	}
 	const pattern = getDestructuredPattern(node);
 	let propertyRead = false;
 	let sourceRead = false;
@@ -265,9 +283,23 @@ const isAliasWrapper = (node: TSESTree.Node, parent: TSESTree.Node) => (
 	|| (parent.type === 'TSSatisfiesExpression' && parent.expression === node)
 	|| (parent.type === 'TSNonNullExpression' && parent.expression === node)
 	|| (parent.type === 'TSTypeAssertion' && parent.expression === node)
+	|| (parent.type === 'TSInstantiationExpression' && parent.expression === node)
 	|| (parent.type === 'ConditionalExpression' && parent.test !== node)
 	|| parent.type === 'LogicalExpression'
 );
+
+const unwrapAssignmentTarget = (target: TSESTree.Node) => {
+	while (
+		target.type === 'TSAsExpression'
+		|| target.type === 'TSSatisfiesExpression'
+		|| target.type === 'TSNonNullExpression'
+		|| target.type === 'TSTypeAssertion'
+		|| target.type === 'TSInstantiationExpression'
+	) {
+		target = target.expression;
+	}
+	return target.type === 'Identifier' ? target : undefined;
+};
 
 // This value walk is the inverse of isAliasWrapper and also follows chained assignments
 const getAliasedIdentifiers = (
@@ -291,7 +323,8 @@ const getAliasedIdentifiers = (
 			case 'TSAsExpression':
 			case 'TSSatisfiesExpression':
 			case 'TSNonNullExpression':
-			case 'TSTypeAssertion': {
+			case 'TSTypeAssertion':
+			case 'TSInstantiationExpression': {
 				pending.push(value.expression);
 				break;
 			}
@@ -305,8 +338,9 @@ const getAliasedIdentifiers = (
 			}
 			case 'AssignmentExpression': {
 				if (value.operator === '=') {
-					if (value.left.type === 'Identifier') {
-						identifiers.push(value.left);
+					const target = unwrapAssignmentTarget(value.left);
+					if (target) {
+						identifiers.push(target);
 					}
 					pending.push(value.right);
 				}
@@ -341,6 +375,7 @@ const getUseSite = (node: TSESTree.Node, cache: WeakMap<TSESTree.Node, UseSite>)
 			&& parent.operator === '='
 			&& parent.right === current
 			&& parent.left.type !== 'ObjectPattern'
+			&& parent.left.type !== 'ArrayPattern'
 		))) {
 			break;
 		}
@@ -365,13 +400,15 @@ const getUseSite = (node: TSESTree.Node, cache: WeakMap<TSESTree.Node, UseSite>)
 			parent?.type === 'AssignmentExpression'
 			&& parent.operator === '='
 			&& parent.right === child
-			&& parent.left.type === 'Identifier'
 		) {
-			site = {
-				expression: site.expression,
-				binding: parent.left,
-				next: site,
-			};
+			const binding = unwrapAssignmentTarget(parent.left);
+			if (binding) {
+				site = {
+					expression: site.expression,
+					binding,
+					next: site,
+				};
+			}
 		}
 		cache.set(child, site);
 	}
@@ -893,6 +930,15 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 		};
 
 		const useSites = new WeakMap<TSESTree.Node, UseSite>();
+		const classifiedUses = new WeakMap<TSESTree.Node, UseFlags>();
+		const getClassifiedUse = (node: TSESTree.Node) => {
+			let use = classifiedUses.get(node);
+			if (!use) {
+				use = classifyUse(node);
+				classifiedUses.set(node, use);
+			}
+			return use;
+		};
 		const groups = new WeakMap<TSESLint.Scope.Variable, UseFlags>();
 		const getBindingVariable = (identifier: TSESTree.Identifier) => {
 			const { parent } = identifier;
@@ -939,7 +985,7 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 						let site: UseSite | undefined = getUseSite(start, useSites);
 						while (site && !visitedUseSites.has(site)) {
 							visitedUseSites.add(site);
-							const use = classifyUse(site.expression);
+							const use = getClassifiedUse(site.expression);
 							group.constructed ||= use.constructed;
 							group.propertyRead ||= use.propertyRead;
 							group.sourceRead ||= use.sourceRead;
@@ -983,7 +1029,7 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 
 		const hasUse = (node: TSESTree.Node, flag: keyof UseFlags) => {
 			let site: UseSite | undefined = getUseSite(node, useSites);
-			if (classifyUse(site.expression)[flag]) {
+			if (getClassifiedUse(site.expression)[flag]) {
 				return true;
 			}
 			while (site) {

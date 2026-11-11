@@ -2087,6 +2087,9 @@ describe('prefer-arrow-functions', () => {
 					'let f; f = function(){}; f.name',
 					'function f(){} const { prototype } = f',
 					'function f(){} let name; ({ name } = f)',
+					'function f(){} let prototype; ({ prototype } = f)',
+					'function f(){} const b = ({} = f); new b()',
+					'function f(){} const b = ([] = f); new b()',
 					'function f(){} const { ["prototype"]: c } = x || f',
 					'function f(){} const { [`prototype`]: c } = f',
 					'function f(){} f[`prototype`]',
@@ -2168,6 +2171,7 @@ describe('prefer-arrow-functions', () => {
 			invalid: [
 				...[
 					['function f(){} const { call } = f', 'const f = () => {}; const { call } = f'],
+					['function f(){} let call; ({ call } = f)', 'const f = () => {}; let call; ({ call } = f)'],
 					['function f(){} const { [k]: v } = f', 'const f = () => {}; const { [k]: v } = f'],
 					['function f(){} const { ...rest } = f', 'const f = () => {}; const { ...rest } = f'],
 					['o.f = function(){}', 'o.f = () => {}'],
@@ -2241,6 +2245,14 @@ describe('prefer-arrow-functions', () => {
 						'function f(){} const { name } = f as any',
 						'const a = (function(){} as any); const b = a; new b()',
 						'new (function(){} as any)()',
+						'function f<T>(){} const g = f<string>; new g()',
+						'function f<T>(){} new (f<string>)()',
+						'let b: any; b! = function(){}; new b()',
+						'let b: any; (b as any) = function(){}; new b()',
+						'let b: any; (<any>b) = function(){}; new b()',
+						'let b: any; (b satisfies any) = function(){}; new b()',
+						'function f(){} let b: any; const c = (b! = f); new c()',
+						'function f(){} const b = (({} = f) as any); new b()',
 					].map(code => ({ code })),
 					{
 						name: 'aliases / as',

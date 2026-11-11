@@ -429,6 +429,68 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 			}
 		};
 
+		const getThisTagHost = (node: FunctionNode): TSESTree.Node | undefined => {
+			const { parent } = node;
+			if (node.type === 'FunctionDeclaration') {
+				return node;
+			}
+			if (parent.type === 'MethodDefinition') {
+				return parent;
+			}
+			if (parent.type === 'PropertyDefinition' && parent.value === node) {
+				return parent;
+			}
+			if (parent.type === 'VariableDeclarator') {
+				if (
+					parent.init === node
+					&& parent.parent.type === 'VariableDeclaration'
+					&& parent.parent.declarations[0] === parent
+				) {
+					return parent.parent;
+				}
+				return;
+			}
+
+			// TypeScript follows a defaulted assignment such as `o.f = o.f || function () {}`
+			let value: TSESTree.Node = node;
+			while (
+				value.parent?.type === 'LogicalExpression'
+				&& value.parent.right === value
+				&& (value.parent.operator === '||' || value.parent.operator === '??')
+			) {
+				value = value.parent;
+			}
+			while (
+				value.parent?.type === 'AssignmentExpression'
+				&& value.parent.right === value
+			) {
+				value = value.parent;
+			}
+			if (value.type === 'AssignmentExpression' && value.parent?.type === 'ExpressionStatement') {
+				return value.parent;
+			}
+		};
+
+		const hasThisTagInComment = (commentHost: TSESTree.Node) => {
+			const comment = context.sourceCode.getCommentsBefore(commentHost).findLast(
+				entry => entry.type === 'Block' && entry.value.startsWith('*'),
+			);
+			return comment !== undefined && /@this\b/u.test(comment.value);
+		};
+
+		// TypeScript reads `@this` from the last JSDoc comment on these hosts only
+		const hasThisTag = (node: FunctionNode) => {
+			const host = getThisTagHost(node);
+			return host !== undefined && (
+				hasThisTagInComment(host)
+				|| (
+					(host.parent?.type === 'ExportNamedDeclaration'
+						|| host.parent?.type === 'ExportDefaultDeclaration')
+					&& hasThisTagInComment(host.parent)
+				)
+			);
+		};
+
 		const resolveTypeAlias = (reference: TSESTree.TSTypeReference) => {
 			if (reference.typeName.type !== 'Identifier') {
 				return;
@@ -856,6 +918,10 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 			// Arrow functions cannot declare a TypeScript `this` parameter
 			const [firstParameter] = node.params;
 			if (firstParameter?.type === 'Identifier' && firstParameter.name === 'this') {
+				return false;
+			}
+			// In checked JavaScript, a host's JSDoc `@this` on an arrow function reports TS2730
+			if (hasThisTag(node)) {
 				return false;
 			}
 

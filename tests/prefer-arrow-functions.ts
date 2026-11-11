@@ -1350,6 +1350,150 @@ describe('prefer-arrow-functions', () => {
 		});
 	});
 
+	describe('JSDoc this', () => {
+		const errors = [{ messageId: 'preferArrowFunction' as const }];
+		const cases = {
+			valid: [
+				{
+					name: 'JSDoc this / declaration',
+					code: '/** @this {A} */ function f() {}',
+				},
+				{
+					name: 'JSDoc this / exported declaration',
+					code: '/** @this {A} */ export function f() {}',
+				},
+				{
+					name: 'JSDoc this / default declaration',
+					code: '/** @this {A} */ export default function f() {}',
+				},
+				{
+					name: 'JSDoc this / inside default export',
+					code: 'export default /** @this {A} */ function f() {}',
+				},
+				{
+					name: 'JSDoc this / variable',
+					code: '/** @this {A} */ const f = function () {}',
+				},
+				{
+					name: 'JSDoc this / exported variable',
+					code: '/** @this {A} */ export const f = function () {}',
+				},
+				{
+					name: 'JSDoc this / assignment',
+					code: '/** @this {A} */ f = function () {}',
+				},
+				{
+					name: 'JSDoc this / chained assignment',
+					code: '/** @this {A} */ a = b = c = function () {}',
+				},
+				{
+					name: 'JSDoc this / compound assignment',
+					code: '/** @this {A} */ a += function () {}',
+				},
+				{
+					name: 'JSDoc this / defaulted assignment',
+					code: '/** @this {A} */ o.f = o.f || function () {}',
+				},
+				{
+					name: 'JSDoc this / nullish defaulted assignment',
+					code: '/** @this {A} */ o.f = p ?? function () {}',
+				},
+				{
+					name: 'JSDoc this / first declarator',
+					code: '/** @this {A} */ const a = function () {}, b = 1',
+				},
+				{
+					name: 'JSDoc this / class method',
+					code: 'class A { /** @this {A} */ f() {} }',
+					options: [{ classMethods: true }] as [{ classMethods: boolean }],
+				},
+				{
+					name: 'JSDoc this / class field',
+					code: 'class A {\n/** @this {{a: number}} */\nf = function () {}\n}',
+				},
+				{
+					name: 'JSDoc this / class field same line',
+					code: 'class A { /** @this {{a: number}} */ f = function () {} }',
+				},
+				{
+					name: 'JSDoc this / last JSDoc before ordinary comment',
+					code: '/** @this {A} */ /* ordinary */ function f() {}',
+				},
+			],
+			invalid: [
+				{
+					name: 'JSDoc this / bare logical expression',
+					code: '/** @this {A} */ o.f || function () {}',
+					output: '/** @this {A} */ o.f || (() => {})',
+					errors,
+				},
+				{
+					name: 'JSDoc this / logical around assignment',
+					code: '/** @this {A} */ a = b || (c = function () {})',
+					output: '/** @this {A} */ a = b || (c = () => {})',
+					errors,
+				},
+				{
+					name: 'JSDoc this / ordinary comment',
+					code: '/* @this {A} */ function f() {}',
+					output: '/* @this {A} */ const f = () => {}',
+					errors,
+				},
+				{
+					name: 'JSDoc this / last JSDoc wins',
+					code: '/** @this {A} */ /** other */ function f() {}',
+					output: '/** @this {A} */ /** other */ const f = () => {}',
+					errors,
+				},
+				{
+					name: 'JSDoc this / different tag',
+					code: '/** @thisArg {A} */ function f() {}',
+					output: '/** @thisArg {A} */ const f = () => {}',
+					errors,
+				},
+				{
+					name: 'JSDoc this / object property',
+					code: '({ /** @this {A} */ f: function () {} })',
+					output: '({ /** @this {A} */ f: () => {} })',
+					errors,
+				},
+				{
+					name: 'JSDoc this / object method',
+					code: '({ /** @this {A} */ f() {} })',
+					output: '({ /** @this {A} */ f: () => {} })',
+					errors,
+				},
+				{
+					name: 'JSDoc this / call argument',
+					code: 'g(/** @this {A} */ function () {})',
+					output: 'g(/** @this {A} */ () => {})',
+					errors,
+				},
+				{
+					name: 'JSDoc this / second declarator',
+					code: '/** @this {A} */ const a = 1, b = function () {}',
+					output: '/** @this {A} */ const a = 1, b = () => {}',
+					errors,
+				},
+				{
+					name: 'JSDoc this / nested assignment on left',
+					code: '/** @this {A} */ (a = function () {}).x = 1',
+					output: '/** @this {A} */ (a = () => {}).x = 1',
+					errors,
+				},
+			],
+		};
+		describe('typescript parser', () => {
+			ruleTester.run('prefer-arrow-functions', preferArrowFunctions, cases);
+		});
+		describe('javascript parser', () => {
+			EslintRuleTester.describe = describe;
+			EslintRuleTester.it = test;
+			const eslintRuleTester = new EslintRuleTester();
+			eslintRuleTester.run('prefer-arrow-functions', preferArrowFunctions as unknown as Rule.RuleModule, cases);
+		});
+	});
+
 	describe('classMethods', () => {
 		const options = [{ classMethods: true }] as const;
 

@@ -9,9 +9,11 @@ Arrow functions are more concise and have fewer features compared to regular fun
 
 When you encounter an arrow function, you can quickly assume it's straightforward. Conversely, when you encounter traditional `function () {}` syntax, you can expect it to be more complex and requiring closer attention.
 
+The README shows [the behavior that `function` adds](../../README.md#did-you-know) and [when you still need `function`](../../README.md#when-you-still-need-function).
+
 ## Behavior
 
-This rule generates warnings when traditional function syntax (`function () {}`) is used when it could be replaced with arrow function syntax (`() => {}`). The fixes preserve comments, whitespace, and types.
+This rule generates warnings when traditional function syntax (`function () {}`) is used when it could be replaced with arrow function syntax (`() => {}`). The fixes preserve comments, whitespace, and type annotations.
 
 
 ## Examples
@@ -295,7 +297,7 @@ These count when read through the function's variable, such as `fn.name`, or dir
 
 ### TypeScript
 - [`this` parameters](https://www.typescriptlang.org/docs/handbook/2/functions.html#declaring-this-in-a-function)
-- [Assertion functions](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-3-7.html#assertion-functions) (`asserts value`) and `never` return types. TypeScript only uses them to narrow types and detect unreachable code when the function is a declaration.
+- [Assertion functions](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-3-7.html#assertion-functions) (`asserts value`) and `never` return types. TypeScript only uses them to narrow types and detect unreachable code when the function is a declaration or a variable with an explicit function type, and a converted `const` has no type annotation.
 - Function declarations whose parameter, return, or type parameter types use `typeof value`, when `value` has no type annotation and its initializer uses the function. As a `const`, the function's type and the value's inferred type depend on each other, and TypeScript can report `TS7022`.
 
 
@@ -307,6 +309,10 @@ These count when read through the function's variable, such as `fn.name`, or dir
 - **Uses in other files.** Another file can read a converted function's `.length`, `.name`, or `prototype`, or call it with `new`. List those functions in [`allowedNames`](#allowednames).
 - **Import cycles.** In an import cycle, another module can call an exported function before its own module finishes running. A function declaration already works at that point, but a `const` arrow function does not exist yet, so the call throws. This also applies to any converted helper that the exported function calls. Bundling does not prevent it. Disable the rule for modules that other modules in a cycle call while they load.
 - **Code that reads a function's source.** Converting a function changes its source text, which `fn.toString()` returns. Code that reads a function's source breaks, for example to run it in another context, or to read its parameter names for dependency injection, as `async.autoInject()` does.
+- **Indirect uses.** The rule checks direct uses of a function's name. It doesn't follow a function through another variable, so `const g = f; new g()` throws after `f` is converted. List those functions in [`allowedNames`](#allowednames).
+- **Inferred return types.** A function declaration and a `const` arrow function can get different inferred types. An exported recursive function without a return type annotation, such as `export function f(n: number) { if (n) return f(n - 1); return 1 }`, has the return type `any` as a `const`, which `noImplicitAny` reports as `TS7023`. A function that only throws has the return type `void` (or `Promise<void>` if async) as a declaration and `never` (or `Promise<never>`) as an arrow function, which changes its `.d.ts` output. Add a return type annotation to keep the type.
+- **Type augmentation in other files.** Another module can add overloads, or a `namespace` that contains values, to an exported function with `declare module`. A `const` can't merge with them, so TypeScript reports `TS2451`. List those functions in [`allowedNames`](#allowednames).
+- **JSDoc `@this` in checked JavaScript.** With `checkJs`, TypeScript reads `/** @this {Window} */` as a `this` parameter, and reports `TS2730` on an arrow function. The rule doesn't read JSDoc tags.
 - **Older syntax targets.** The fixes output ES2015 syntax: arrow functions and `const`. With `classMethods`, they output class fields, which are ES2022. Do not enable the rule for code that must run without a build step in older environments, or that a tool parses with an older syntax version, such as an ESLint config with `ecmaVersion: 3`.
 
 ## Options

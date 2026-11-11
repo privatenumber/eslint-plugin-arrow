@@ -1367,6 +1367,10 @@ describe('prefer-arrow-functions', () => {
 					code: '/** @this {A} */ export default function f() {}',
 				},
 				{
+					name: 'JSDoc this / inside default export',
+					code: 'export default /** @this {A} */ function f() {}',
+				},
+				{
 					name: 'JSDoc this / variable',
 					code: '/** @this {A} */ const f = function () {}',
 				},
@@ -1379,9 +1383,25 @@ describe('prefer-arrow-functions', () => {
 					code: '/** @this {A} */ f = function () {}',
 				},
 				{
+					name: 'JSDoc this / chained assignment',
+					code: '/** @this {A} */ a = b = c = function () {}',
+				},
+				{
+					name: 'JSDoc this / first declarator',
+					code: '/** @this {A} */ const a = function () {}, b = 1',
+				},
+				{
 					name: 'JSDoc this / class method',
 					code: 'class A { /** @this {A} */ f() {} }',
 					options: [{ classMethods: true }] as [{ classMethods: boolean }],
+				},
+				{
+					name: 'JSDoc this / class field',
+					code: 'class A {\n/** @this {{a: number}} */\nf = function () {}\n}',
+				},
+				{
+					name: 'JSDoc this / class field same line',
+					code: 'class A { /** @this {{a: number}} */ f = function () {} }',
 				},
 				{
 					name: 'JSDoc this / last JSDoc before ordinary comment',
@@ -1426,9 +1446,15 @@ describe('prefer-arrow-functions', () => {
 					errors,
 				},
 				{
-					name: 'JSDoc this / multiple declarators',
-					code: '/** @this {A} */ const a = function () {}, b = 1',
-					output: '/** @this {A} */ const a = () => {}, b = 1',
+					name: 'JSDoc this / second declarator',
+					code: '/** @this {A} */ const a = 1, b = function () {}',
+					output: '/** @this {A} */ const a = 1, b = () => {}',
+					errors,
+				},
+				{
+					name: 'JSDoc this / nested assignment on left',
+					code: '/** @this {A} */ (a = function () {}).x = 1',
+					output: '/** @this {A} */ (a = () => {}).x = 1',
 					errors,
 				},
 			],

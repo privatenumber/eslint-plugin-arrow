@@ -437,33 +437,43 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 				host = node;
 			} else if (parent.type === 'MethodDefinition') {
 				host = parent;
+			} else if (parent.type === 'PropertyDefinition' && parent.value === node) {
+				host = parent;
 			} else if (
 				parent.type === 'VariableDeclarator'
 				&& parent.init === node
 				&& parent.parent.type === 'VariableDeclaration'
-				&& parent.parent.declarations.length === 1
+				&& parent.parent.declarations[0] === parent
 			) {
 				host = parent.parent;
-			} else if (
-				parent.type === 'AssignmentExpression'
-				&& parent.right === node
-				&& parent.parent.type === 'ExpressionStatement'
-			) {
-				host = parent.parent;
+			} else if (parent.type === 'AssignmentExpression' && parent.right === node) {
+				let assignment = parent;
+				while (
+					assignment.parent.type === 'AssignmentExpression'
+					&& assignment.parent.right === assignment
+				) {
+					assignment = assignment.parent;
+				}
+				if (assignment.parent.type === 'ExpressionStatement') {
+					host = assignment.parent;
+				}
 			}
 			if (!host) {
 				return false;
 			}
+			const hosts = [host];
 			if (
 				host.parent?.type === 'ExportNamedDeclaration'
 				|| host.parent?.type === 'ExportDefaultDeclaration'
 			) {
-				host = host.parent;
+				hosts.push(host.parent);
 			}
-			const comment = context.sourceCode.getCommentsBefore(host).findLast(
-				entry => entry.type === 'Block' && entry.value.startsWith('*'),
-			);
-			return comment !== undefined && /@this\b/u.test(comment.value);
+			return hosts.some((commentHost) => {
+				const comment = context.sourceCode.getCommentsBefore(commentHost).findLast(
+					entry => entry.type === 'Block' && entry.value.startsWith('*'),
+				);
+				return comment !== undefined && /@this\b/u.test(comment.value);
+			});
 		};
 
 		const resolveTypeAlias = (reference: TSESTree.TSTypeReference) => {

@@ -48,12 +48,15 @@ A JSDoc `@returns {never}` in JavaScript does not need a skip: the arrow functio
 
 **Decision:** skip when the last `/** */` comment on the function's JSDoc host contains a `@this` tag. The hosts are the ones where TypeScript moves the tag onto the converted arrow function ([jsdoc-this.md](../typescript/jsdoc-this.md#observed)):
 
-- a function declaration, with the comment before `export` when the declaration is exported
-- a variable statement whose only declarator has the function as its initializer
-- an assignment whose right side is the function
+- a function declaration. When it is exported, both the comment before `export` and the comment between `export default` and `function` count, because the default export fix moves the export after the new `const`, which turns the inner comment into a tag on the arrow function.
+- a variable statement whose first declarator has the function as its initializer. TypeScript attaches the statement's JSDoc to the first declarator only.
+- an assignment statement whose right side is the function, through any chain such as `a = b = function () {}`
+- a class field whose value is the function. A comment on the same line as the field did not report TS2730, and one on the line before it did; the skip ignores placement.
 - a class method, under `classMethods`
 
-Object properties, object methods, and call arguments convert, because the tag does not reach the arrow function there.
+Object properties, object methods, and call arguments convert. TypeScript still reads the tag there, but converting them did not report TS2730.
+
+The tag match is a plain `@this` word match, which also skips a comment that only mentions `@this` in backticks. TypeScript parses tags mid-line too, so a start-of-line match would miss real tags. An independent review of #6 found the first declarator, class field, chained assignment, and default export cases.
 
 The skip applies to every file type, not only `.js` files with `checkJs`. A TypeScript file ignores the tag, so the skip only costs a conversion there, and the rule cannot see `checkJs`.
 

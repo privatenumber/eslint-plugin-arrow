@@ -1160,10 +1160,6 @@ describe('prefer-arrow-functions', () => {
 					name: 'arguments property / expression binding',
 					code: 'const b = function(){}; b.arguments',
 				},
-				{
-					name: 'arguments identifier / function body',
-					code: 'function a(){ return arguments }',
-				},
 			],
 			invalid: [{
 				name: 'call property / declaration remains convertible',

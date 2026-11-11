@@ -127,7 +127,7 @@ Issues [#2](https://github.com/privatenumber/eslint-plugin-arrow/issues/2) and [
 
 Issue [#7](https://github.com/privatenumber/eslint-plugin-arrow/issues/7). The rule skips a function used with `new`, `instanceof`, or `extends`, or whose properties are read, but only through its own name. `const B = A; new B()` converted `A`, and threw `TypeError: B is not a constructor`. Biome has related open gaps; see [prior-art.md](./prior-art.md#other-tools).
 
-**Decision**, shipping with the PR that closes #7: apply the constructor and property checks to every variable the function's value can flow into by simple assignment. The rule groups such variables into alias groups, once per file and only when a function needs them. Two variables are in the same group when one is assigned to the other by a declarator initializer, an assignment, including each target of a chained `a = b = F`, or a parameter default such as `function g(B = F)`. The value can pass through:
+**Decision**, shipping with the PR that closes #7: apply the constructor and property checks to every variable the function's value can flow into by simple assignment. The rule groups such variables into alias groups, once per file and only when a function needs them. Two variables are in the same group when one is assigned to the other by a declarator initializer, an assignment, including each target of a chained `a = b = F`, or a default value such as `function g(B = F)` or `const [B = F] = []`. The value can pass through:
 
 - a TypeScript wrapper: `as`, `satisfies`, `!`, `<T>`, or an instantiation expression such as `F<T>`
 - a branch of a conditional expression
@@ -143,7 +143,7 @@ A group records whether any member is constructed, has a disallowed property rea
 
 Groups are undirected, so they are conservative: in `let a = f; a = g; new a()`, both `f` and `g` are kept, although only the value in `a` at the `new` matters. Following the order of writes needs data flow analysis. Building the groups visits each reference once per file. On real code the cost is close to linear, but synthetic inputs that put hundreds of functions or identifiers in one expression, such as `a0 = a1 = ... = (f0 || f1 || ...)`, are quadratic: about 140 ms for 800 of each, against 34 ms without the rule. The rule accepts that, because removing it needs shared state across groups.
 
-Four other forms read a property without a member expression on the name, and also count:
+Four other forms also count as property reads. They read through a later binding, a destructuring pattern, or a computed key:
 
 - an assignment that binds a function expression after the declaration, as in `let f; f = function () {}; f.caller`
 - object destructuring with a static key, as in `const { prototype } = F`
@@ -158,7 +158,7 @@ Keeping a function whose `caller` is read does not keep its callers. In `functio
 
 Every other way a function reaches another name is not followed: objects and arrays (`{ A }`, `[A]`), destructuring the function out of an object, function arguments (`vi.fn(A)`, `Reflect.construct(A, [])`), and returns. Each would need to follow values through data structures or calls, which needs data flow analysis. The call argument case has its own issue, [#10](https://github.com/privatenumber/eslint-plugin-arrow/issues/10), because Biome #9585 shows it in real test code.
 
-The rule docs list the forms the rule follows, not the forms it misses. Each review round found another unlisted form, such as parameter defaults and `(0, A)`, so a list of misses could not be complete, while a list of followed forms is exact.
+The rule docs list every form the rule follows, and give only examples of the forms it misses. Each review round found another unlisted form, such as parameter defaults and `(0, A)`, so a list of misses could not be complete, while a list of followed forms is exact.
 
 ## Direct `eval`
 

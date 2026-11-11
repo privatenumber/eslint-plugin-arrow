@@ -175,7 +175,6 @@ ES modules and class bodies are always strict. But CommonJS files and classic `<
 - **It works before its module finishes loading.** In an import cycle, another module can call a function declaration before its file has run. The same call to a `const` throws `Cannot access 'helper' before initialization`.
 - **Object methods have `super`.** With `{ __proto__: base, hi() { return super.hi() } }`, `super` reads from the object's prototype, not only in classes.
 - **`__proto__` means two different things.** `{ __proto__() {} }` defines a method. `{ __proto__: fn }` sets the object's prototype.
-- **Its source is readable.** `f.toString()` returns the exact source text, and some libraries read parameter names from it.
 
 </details>
 

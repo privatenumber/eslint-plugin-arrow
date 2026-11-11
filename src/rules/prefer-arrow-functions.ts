@@ -228,6 +228,13 @@ const getDestructuredPattern = (node: TSESTree.Node) => {
 	) {
 		return parent.left;
 	}
+	if (
+		parent?.type === 'AssignmentPattern'
+		&& parent.right === node
+		&& parent.left.type === 'ObjectPattern'
+	) {
+		return parent.left;
+	}
 };
 
 type UseFlags = {

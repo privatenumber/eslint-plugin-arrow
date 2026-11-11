@@ -2081,6 +2081,9 @@ describe('prefer-arrow-functions', () => {
 		const cases = {
 			valid: [
 				...[
+					'function f(){} const g = ({ prototype } = f) => prototype',
+					'function f(){} const g = ({ x: { prototype } = f }) => prototype',
+					'function f(){ return function(){} } const g = ({ toString } = f) => toString.call(f)',
 					'function f(){} new (x ? f : y)()',
 					'function f(){} (x || f).name',
 					'let f; f = function(){}; new f()',

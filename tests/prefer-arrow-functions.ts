@@ -191,6 +191,14 @@ describe('prefer-arrow-functions', () => {
 				name: 'function toString / nested in a class that reads its own source through an alias',
 				code: 'class A { static { const d = A; d.toString() } b(){ c(function(){}) } }',
 			},
+			{
+				name: 'function toString / nested in a declaration that shares a parameter name',
+				code: '(a) => { function a(){ return function(){} } a.toString() }',
+			},
+			{
+				name: 'function toString / nested in a repeated declaration',
+				code: '() => { var a = 1; function a(){ return function(){} } a.toString() }',
+			},
 
 			// Ignores generators
 			{

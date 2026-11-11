@@ -1041,10 +1041,11 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 				}
 				site = site.next;
 			}
-			// A class declaration has two own-name bindings: one outside and one inside its body
+			// A class declaration has two own-name bindings: one outside and one inside its body.
+			// Match definitions, because a parameter or an earlier declaration can share the variable
 			if ('id' in node && node.id) {
 				for (const variable of context.sourceCode.getDeclaredVariables!(node)) {
-					if (variable.identifiers[0] === node.id) {
+					if (variable.defs.some(definition => definition.name === node.id)) {
 						merge(getGroup(variable));
 					}
 				}

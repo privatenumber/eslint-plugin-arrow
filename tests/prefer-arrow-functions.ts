@@ -1911,6 +1911,10 @@ describe('prefer-arrow-functions', () => {
 					code: "function a(){ return eval?.('1') }",
 				},
 				{
+					name: 'eval in a parameter default',
+					code: "function a(b = eval('arguments[1]')){ return b }",
+				},
+				{
 					name: 'local eval binding',
 					code: "function a(eval, b){ return eval('arguments[1]') }",
 					languageOptions: {
@@ -1938,10 +1942,10 @@ describe('prefer-arrow-functions', () => {
 					output: "const a = () => { return globalThis.eval('1') }",
 				},
 				{
-					name: 'eval outside function body',
-					code: "eval('1'); function a(b = eval('2')){ return b }",
+					name: 'eval outside the function',
+					code: "eval('1'); function a(b){ return b }",
 					errors,
-					output: "eval('1'); const a = (b = eval('2')) => { return b }",
+					output: "eval('1'); const a = (b) => { return b }",
 				},
 			],
 		};

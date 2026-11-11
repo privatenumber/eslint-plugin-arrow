@@ -945,9 +945,9 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 				return false;
 			}
 
-			// Include nested functions: eval can read bindings that an arrow would change
-			const evalPosition = evalCallPositions[evalCallIndex(node.body.range[0])];
-			if (evalPosition !== undefined && evalPosition < node.body.range[1]) {
+			// Include parameters and nested functions: eval can read bindings that an arrow would change
+			const evalPosition = evalCallPositions[evalCallIndex(node.range[0])];
+			if (evalPosition !== undefined && evalPosition < node.range[1]) {
 				return false;
 			}
 

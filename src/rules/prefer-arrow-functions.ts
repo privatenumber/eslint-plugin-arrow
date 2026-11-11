@@ -416,35 +416,69 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 			return references;
 		};
 
-		// A function declaration's type is its signature, but a `const` takes its type from its
-		// initializer. When the signature reads `typeof value`, and that value's inferred type comes
-		// from an initializer that uses the function, the converted types depend on each other.
-		// Whether TypeScript then reports TS7022 depends on its check order, so any match is skipped
+		const findVariable = (node: TSESTree.Node, name: string) => {
+			for (
+				let scope: TSESLint.Scope.Scope | null = context.sourceCode.getScope!(node);
+				scope;
+				scope = scope.upper
+			) {
+				const variable = scope.set.get(name);
+				if (variable) {
+					return variable;
+				}
+			}
+		};
+
+		const resolveTypeAlias = (reference: TSESTree.TSTypeReference) => {
+			if (reference.typeName.type !== 'Identifier') {
+				return;
+			}
+			const variable = findVariable(reference, reference.typeName.name);
+			const declaration = variable?.defs.find(def => def.node.type === 'TSTypeAliasDeclaration')?.node;
+			return declaration?.type === 'TSTypeAliasDeclaration' ? declaration : undefined;
+		};
+
+		// Cache each alias's direct queries and dependencies so its syntax is walked once per file
+		const aliasContents = new Map<TSESTree.TSTypeAliasDeclaration, {
+			queries: Set<TSESLint.Scope.Variable>;
+			aliases: TSESTree.TSTypeAliasDeclaration[];
+		}>();
+
+		const resolveQuery = (query: TSESTree.TSTypeQuery) => {
+			let name = query.exprName;
+			while (name.type === 'TSQualifiedName') {
+				name = name.left;
+			}
+			if (name.type !== 'Identifier') {
+				return;
+			}
+			return findVariable(query, name.name);
+		};
+
+		// As a `const`, a signature that reads its own type, directly or through same-file aliases,
+		// or `typeof` a value whose initializer uses the function, can cause a circular type error
 		const hasCircularTypeQuery = (
 			node: TSESTree.FunctionDeclaration,
 			references: TSESLint.Scope.Reference[],
 		) => {
 			let circular = false;
+			const [ownVariable] = context.sourceCode.getDeclaredVariables!(node);
+			const aliases: TSESTree.TSTypeAliasDeclaration[] = [];
 			walk(context.sourceCode, [node.returnType, node.typeParameters, ...node.params], (child) => {
+				if (child.type === 'TSTypeReference') {
+					const alias = resolveTypeAlias(child);
+					if (alias) {
+						aliases.push(alias);
+					}
+				}
 				if (circular || child.type !== 'TSTypeQuery') {
 					return;
 				}
 
-				let name = child.exprName;
-				while (name.type === 'TSQualifiedName') {
-					name = name.left;
-				}
-				if (name.type !== 'Identifier') {
+				const variable = resolveQuery(child);
+				if (variable === ownVariable) {
+					circular = true;
 					return;
-				}
-
-				let variable: TSESLint.Scope.Variable | undefined;
-				for (
-					let scope: TSESLint.Scope.Scope | null = context.sourceCode.getScope!(node);
-					scope && !variable;
-					scope = scope.upper
-				) {
-					variable = scope.set.get(name.name);
 				}
 
 				const declarator = variable?.defs[0]?.node;
@@ -461,6 +495,40 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 					identifier.range[0] >= start && identifier.range[1] <= end
 				));
 			});
+			const visited = new Set<TSESTree.TSTypeAliasDeclaration>();
+			while (!circular && aliases.length > 0) {
+				const alias = aliases.pop()!;
+				if (visited.has(alias)) {
+					continue;
+				}
+				visited.add(alias);
+				let contents = aliasContents.get(alias);
+				if (!contents) {
+					contents = {
+						queries: new Set(),
+						aliases: [],
+					};
+					const current = contents;
+					walk(context.sourceCode, [alias], (child) => {
+						if (child.type === 'TSTypeQuery') {
+							const variable = resolveQuery(child);
+							if (variable) {
+								current.queries.add(variable);
+							}
+						} else if (child.type === 'TSTypeReference') {
+							const dependency = resolveTypeAlias(child);
+							if (dependency) {
+								current.aliases.push(dependency);
+							}
+						}
+					});
+					aliasContents.set(alias, contents);
+				}
+				circular = contents.queries.has(ownVariable);
+				for (const dependency of contents.aliases) {
+					aliases.push(dependency);
+				}
+			}
 			return circular;
 		};
 

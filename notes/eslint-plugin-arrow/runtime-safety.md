@@ -137,18 +137,20 @@ Issue [#7](https://github.com/privatenumber/eslint-plugin-arrow/issues/7). The r
 
 The same wrappers count on a direct use, so `new (F as any)()` is a constructor use like `new F()`. They also count on an assignment target, because TypeScript removes them: `b! = F` and `(b as any) = F` make `b` an alias.
 
-A destructuring assignment evaluates to its right side, so in `const b = ({} = F)`, `b` is `F`. Following both the pattern and the result would need a second walk, so when the result of a destructuring assignment is used, the rule keeps the function. As a statement, `({ prototype } = F)` is classified by its keys like a destructuring declaration.
+A destructuring assignment evaluates to its right side, so in `const b = ({} = F)`, `b` is `F`. Following both the pattern and the result would need a second walk, so when the result of a destructuring assignment is used, the rule keeps the function. As a statement, `({ prototype } = F)` is classified by its keys like a destructuring declaration. So is an object pattern with the function as its default, as in `({ prototype } = F) => prototype`.
 
 A group records whether any member is constructed, has a disallowed property read, or has its source read. A function is kept when any group it belongs to has a flag set.
 
 Groups are undirected, so they are conservative: in `let a = f; a = g; new a()`, both `f` and `g` are kept, although only the value in `a` at the `new` matters. Following the order of writes needs data flow analysis. Building the groups visits each reference once per file. On real code the cost is close to linear, but synthetic inputs that put hundreds of functions or identifiers in one expression, such as `a0 = a1 = ... = (f0 || f1 || ...)`, are quadratic: about 140 ms for 800 of each, against 34 ms without the rule. The rule accepts that, because removing it needs shared state across groups.
 
-Three other forms read a property without a member expression on the name, and also count:
+Four other forms read a property without a member expression on the name, and also count:
 
 - an assignment that binds a function expression after the declaration, as in `let f; f = function () {}; f.caller`
 - object destructuring with a static key, as in `const { prototype } = F`
 - a template literal key with no substitutions, as in ``f[`caller`]``
-- a static computed key behind a TypeScript wrapper, as in `f['prototype' as const]`
+- either key form behind a TypeScript wrapper, as in `f['prototype' as const]`
+
+Other computed keys are not recognized, even when they are constant, such as `f['proto' + 'type']`. Evaluating them would need constant folding, and such keys are rare.
 
 Each converts in 1.0.0, verified for `caller`, `prototype`, `name`, and `new`.
 
@@ -156,7 +158,7 @@ Keeping a function whose `caller` is read does not keep its callers. In `functio
 
 Every other way a function reaches another name is not followed: objects and arrays (`{ A }`, `[A]`), destructuring the function out of an object, function arguments (`vi.fn(A)`, `Reflect.construct(A, [])`), and returns. Each would need to follow values through data structures or calls, which needs data flow analysis. The call argument case has its own issue, [#10](https://github.com/privatenumber/eslint-plugin-arrow/issues/10), because Biome #9585 shows it in real test code.
 
-The rule docs list the forms the rule follows, not the forms it misses. Three review rounds each found another unlisted form, such as parameter defaults and `(0, A)`, so a list of misses could not be complete, while a list of followed forms is exact.
+The rule docs list the forms the rule follows, not the forms it misses. Each review round found another unlisted form, such as parameter defaults and `(0, A)`, so a list of misses could not be complete, while a list of followed forms is exact.
 
 ## Direct `eval`
 

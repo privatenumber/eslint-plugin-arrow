@@ -85,9 +85,9 @@ Oxlint differs from ESLint in two ways:
 
 ## Did you know?
 
-Every `function` comes with extra behavior. Most functions never use it, but a reader can't know that without checking.
+`function` looks simple, but it hides a lot of behavior. To know what a function can do, you have to know these rules, and not everyone on your team does.
 
-**It can run before its definition.** Function declarations are hoisted, so you can call one above the line that defines it:
+**It runs before it's defined.**
 
 <!-- eslint-skip -->
 ```js
@@ -95,56 +95,54 @@ greet() // Works
 function greet() {}
 ```
 
-In two lines, that looks harmless. In a long file, it means you can't read the code from top to bottom. A call near the top can depend on a function defined hundreds of lines below, and that function can call another one defined somewhere in between. To follow the code, you jump down to each definition and back up to where you left off.
+In a long file, a call can depend on a function hundreds of lines below it. You can't read the code from top to bottom. You jump down to each definition and back up to where you left off.
 
-**Its `this` depends on how you call it.** `call`, `apply`, and `bind` can set `this` to any value. Store a method in a variable, and the method loses its object:
+**Its `this` changes based on how you call it.**
 
 <!-- eslint-skip -->
 ```js
 const counter = {
     count: 0,
-    get() { return this.count }
+    get: function () { return this.count }
 }
+
+counter.get() // 0
+
 const get = counter.get
 get() // TypeError: Cannot read properties of undefined (reading 'count')
 ```
 
-**It has a hidden `arguments` object.** A function can read arguments that it doesn't declare as parameters:
+It's the same function, called two ways. `call`, `apply`, and `bind` can also set `this` to anything.
+
+**It has a hidden `arguments` object.**
 
 <!-- eslint-skip -->
 ```js
 function sum() { return arguments.length }
-sum(1, 2, 3) // 3
+sum(1, 2, 3) // 3, with no parameters declared
 ```
 
-**It's also a constructor.** You can call a `function` that isn't async or a generator with `new`, and it has a `prototype` object:
+**Any plain `function` is also a constructor.**
 
 <!-- eslint-skip -->
 ```js
 function greet() {}
-new greet() // greet {}
-greet.prototype // {}
+new greet() // greet {}, even if it was never meant to be a constructor
 ```
 
-`Reflect.construct()`, `instanceof`, and `class extends` depend on this too.
+It also gets a `prototype` object, which `instanceof` and `class extends` rely on.
 
-**It can be replaced.** You can assign a new value to a function declaration. Inside a function body, a second declaration with the same name also replaces the first, with no error:
+**It can be silently replaced.**
 
 <!-- eslint-skip -->
 ```js
-function run() {
-    function a() { return 1 }
-    function a() { return 2 }
-    return a() // 2
-}
-
-function b() {}
-b = 5 // No error
+function a() {}
+a = 5 // No error, and `a` is no longer a function
 ```
 
-TypeScript reports both of these, but JavaScript runs them without complaint.
+Declaring `a` twice inside a function body also replaces it. TypeScript reports both, but JavaScript doesn't.
 
-**It can't take a function type.** In TypeScript, you can't annotate a function declaration with a reusable function type. So you repeat its types by hand, and the declaration itself isn't checked against that type:
+**In TypeScript, it can't take a function type.**
 
 <!-- eslint-skip -->
 ```ts
@@ -171,7 +169,11 @@ ES modules and class bodies are always strict. But CommonJS files and classic `<
 
 ### Enter arrow functions
 
-Arrow functions solve all of it. An arrow function in a `const` does one thing: it runs its body when you call it. The error messages below are from Node.js:
+Arrow functions solve all of it. An arrow function in a `const` has none of these hidden rules. It runs its body when you call it, and that's it.
+
+There's less to know and less to rule out. That makes code easier to review, and friendlier to beginners and to anyone who hasn't memorized JavaScript's quirks.
+
+The error messages below are from Node.js:
 
 | `function` | `const` arrow function |
 | --- | --- |

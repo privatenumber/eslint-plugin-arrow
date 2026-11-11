@@ -275,7 +275,7 @@ This rule will not generate warnings or fixes for traditional functions that use
 - [`name`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/name)
 - [`length`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/length)
 - [`prototype`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/prototype)
-- [`caller`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/caller), which differs only for sloppy-mode functions
+- [`caller`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/caller), which differs only for sloppy-mode functions. Keeping the function does not keep its callers: `f.caller.arguments` throws if the calling function was converted, so list callers whose properties are read in [`allowedNames`](#allowednames).
 - [`arguments`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/arguments), which differs only for sloppy-mode functions
 - [`toString()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/toString), which returns the source text. Functions nested inside a function or class whose source is read are kept too.
 

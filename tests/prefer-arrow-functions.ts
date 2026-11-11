@@ -1737,6 +1737,95 @@ describe('prefer-arrow-functions', () => {
 		}
 	});
 
+	describe('recursive returns', () => {
+		const errors = [{ messageId: 'preferArrowFunction' as const }];
+		const cases = {
+			valid: [
+				{
+					name: 'recursive return / exported',
+					code: 'export function f(n) { if (n) return f(n - 1); return 1 }',
+				},
+				{
+					name: 'recursive return / local',
+					code: 'function f() { return f() }',
+				},
+				{
+					name: 'recursive return / awaited',
+					code: 'async function f() { return await f() }',
+				},
+				{
+					name: 'recursive return / optional',
+					code: 'function f() { return f?.() }',
+				},
+				{
+					name: 'recursive return / awaited optional',
+					code: 'async function f() { return await f?.() }',
+				},
+				{
+					name: 'recursive return / nested block',
+					code: 'function f() { { return f() } }',
+				},
+			],
+			invalid: [
+				{
+					name: 'recursive return / nested function',
+					code: 'function f() { return (() => { return f() }) }',
+					output: 'const f = () => { return (() => { return f() }) }',
+					errors,
+				},
+				{
+					name: 'recursive return / shadowed',
+					code: 'function f() { return ((f) => { return f() }) }',
+					output: 'const f = () => { return ((f) => { return f() }) }',
+					errors,
+				},
+				{
+					name: 'recursive return / not returned',
+					code: 'function f() { f(); return 1 }',
+					output: 'const f = () => { f(); return 1 }',
+					errors,
+				},
+				{
+					name: 'recursive return / conditional',
+					code: 'function f(n) { return n ? f(n - 1) : 1 }',
+					output: 'const f = (n) => { return n ? f(n - 1) : 1 }',
+					errors,
+				},
+				{
+					name: 'recursive return / array',
+					code: 'function f() { return [f()] }',
+					output: 'const f = () => { return [f()] }',
+					errors,
+				},
+			],
+		};
+		describe('typescript parser', () => {
+			ruleTester.run('prefer-arrow-functions', preferArrowFunctions, cases);
+			ruleTester.run('prefer-arrow-functions', preferArrowFunctions, {
+				valid: [],
+				invalid: [
+					{
+						name: 'recursive return / annotated',
+						code: 'function f(): number { return f() }',
+						output: 'const f = (): number => { return f() }',
+						errors,
+					},
+					{
+						name: 'recursive return / assertion',
+						code: 'function f() { return f() as number }',
+						output: 'const f = () => { return f() as number }',
+						errors,
+					},
+				],
+			});
+		});
+		describe('javascript parser', () => {
+			EslintRuleTester.describe = describe;
+			EslintRuleTester.it = test;
+			new EslintRuleTester().run('prefer-arrow-functions', preferArrowFunctions as unknown as Rule.RuleModule, cases);
+		});
+	});
+
 	// JavaScript files use ESLint's parser and scope manager, which omit TypeScript-only properties
 	describe('javascript parser', () => {
 		EslintRuleTester.describe = describe;

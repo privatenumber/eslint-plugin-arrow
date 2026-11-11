@@ -1,6 +1,6 @@
 # eslint-plugin-arrow
 
-[ESLint](https://eslint.org) and [Oxlint](https://oxc.rs/docs/guide/usage/linter) rules for JavaScript and TypeScript that convert `function` to arrow functions, and move declarations before their first use. A function is only converted when the arrow function behaves the same, and the autofixes keep your comments, formatting, and type annotations.
+[ESLint](https://eslint.org) and [Oxlint](https://oxc.rs/docs/guide/usage/linter) rules for JavaScript and TypeScript that convert `function` to arrow functions, and move declarations before their first use. The rules leave a function alone when they detect that it needs what `function` adds, and the autofixes keep your comments, formatting, and type annotations.
 
 <!-- eslint-disable pvtnbr/no-function-hoisting, pvtnbr/prefer-arrow-functions, prefer-arrow-callback -->
 ```ts
@@ -79,7 +79,7 @@ export default defineConfig({
 Oxlint differs from ESLint in two ways:
 
 - `oxlint --fix` applies one pass of fixes per run, while `eslint --fix` repeats until nothing changes. If a function needs to be both moved and converted, run `oxlint --fix` again to apply the remaining fix.
-- Oxlint has no `sourceType` setting. It parses a `.js` file without `import` or `export` as a classic script, even in a CommonJS package, and in a classic script a top-level function declaration is a global variable. So `prefer-arrow-functions` keeps top-level function declarations in those files. Use the `.cjs` extension to have them converted.
+- Oxlint has no `sourceType` setting. It parses a `.js` file without `import` or `export` as a classic script, even in a CommonJS package, and in a classic script a top-level function declaration is a global variable. So `prefer-arrow-functions` keeps top-level function declarations in those files. In a CommonJS file, use the `.cjs` extension to have them converted. Don't rename an ES module to `.cjs`, because that changes how it runs.
 
 </details>
 
@@ -142,6 +142,8 @@ function b() {}
 b = 5 // No error
 ```
 
+TypeScript reports both of these, but JavaScript runs them without complaint.
+
 **It can't take a function type.** In TypeScript, you can't annotate a function declaration with a reusable function type. So you repeat its types by hand, and the declaration itself isn't checked against that type:
 
 <!-- eslint-skip -->
@@ -173,7 +175,7 @@ Arrow functions solve all of it. An arrow function in a `const` does one thing: 
 
 | `function` | `const` arrow function |
 | --- | --- |
-| Runs before its definition | Must be defined before it's called, so the file reads from top to bottom. Calling it early throws `Cannot access 'greet' before initialization`. |
+| Runs before its definition | Calling it before its line runs throws `Cannot access 'greet' before initialization`. [`no-function-hoisting`](./docs/rules/no-function-hoisting.md) moves definitions above their first use, so the file reads from top to bottom. |
 | `this` depends on the caller | `this` comes from the code around it, and `call`, `apply`, and `bind` can't change it |
 | Has its own `arguments` | Uses the `arguments` of the enclosing `function`, if there is one |
 | Works with `new` | Throws `greet is not a constructor` |
@@ -188,6 +190,8 @@ So default to arrow functions, and keep `function` for code that needs what it a
 
 ### When you still need `function`
 
+In JavaScript, keep `function` for constructors, generators, and code that needs its own `this` or `arguments`. Methods that use `super` need method syntax.
+
 Some TypeScript features only work on a function declaration, or need extra types on a `const`:
 
 | Feature | Example | As a `const` arrow function |
@@ -198,7 +202,7 @@ Some TypeScript features only work on a function declaration, or need extra type
 | `never` return type | `function fail(): never { throw error }` | Needs an explicit function type on the variable, or code after the call stops being unreachable |
 | Namespace merging | `function f() {}` with `namespace f { export const x = 1 }` | Not supported (TS2451) |
 
-`prefer-arrow-functions` keeps these functions as `function`, because its autofix doesn't add type annotations. It also only sees the current file and the types written in it. Its [limitations](./docs/rules/prefer-arrow-functions.md#limitations) list the cases it keeps, and [Code the rule cannot check](./docs/rules/prefer-arrow-functions.md#code-the-rule-cannot-check) lists type changes it can miss, such as inferred return types.
+`prefer-arrow-functions` keeps these TypeScript functions as `function`, because its autofix doesn't add type annotations. It also only sees the current file and the types written in it. Its [limitations](./docs/rules/prefer-arrow-functions.md#limitations) list the cases it keeps, and [Code the rule cannot check](./docs/rules/prefer-arrow-functions.md#code-the-rule-cannot-check) lists type changes it can miss, such as inferred return types.
 
 **Published types change form.** An exported `const` arrow function appears in `.d.ts` output as `declare const parse: (input: string) => number` instead of `declare function parse(input: string): number`.
 
@@ -206,7 +210,7 @@ Some TypeScript features only work on a function declaration, or need extra type
 
 | Rule | Description |
 | --- | --- |
-| [`prefer-arrow-functions`](./docs/rules/prefer-arrow-functions.md) | Converts `function` declarations, expressions, and methods to arrow functions, when doing so preserves behavior |
+| [`prefer-arrow-functions`](./docs/rules/prefer-arrow-functions.md) | Converts `function` declarations, expressions, and methods to arrow functions, and leaves functions that need what `function` adds |
 | [`no-function-hoisting`](./docs/rules/no-function-hoisting.md) | Moves function declarations above their first use |
 
 The two rules work as a pair. `prefer-arrow-functions` skips any function used before its declaration, because a `const` arrow function can't be used before it's declared. `no-function-hoisting` moves those declarations up first, so `prefer-arrow-functions` can then convert them.

@@ -195,12 +195,7 @@ So default to arrow functions, and keep `function` for code that needs what it a
 
 ### When you still need `function`
 
-In JavaScript, keep `function` for constructors, generators, and code that needs its own `this` or `arguments`.
-
-Keep method syntax for two cases:
-
-- **Methods that use `super`.** With `{ __proto__: base, hi() { return super.hi() } }`, `super` reads from the object's prototype, not only in classes.
-- **A method named `__proto__`.** `{ __proto__() {} }` defines a method, but `{ __proto__: fn }` sets the object's prototype.
+Keep a function declaration or expression for constructors, generators, and code that needs its own `this` or `arguments`.
 
 Some TypeScript features only work on a function declaration, or need extra types on a `const`:
 
@@ -233,6 +228,19 @@ const a = (): never => { throw new Error() } // Code after a call still counts a
 const b: () => never = () => { throw new Error() } // Code after a call is unreachable
 ```
 
+### What about methods?
+
+Method syntax is not the same as `function`. A method isn't hoisted and can't be called with `new`, so most of the problems above don't apply. It keeps `this`, `arguments`, and `super`, which is usually why you wrote a method.
+
+Be careful when you swap a method for an arrow function:
+
+- **`this` isn't the object.** `{ count: 0, get: () => this.count }` doesn't read `count`. The arrow function uses the `this` of the code around the object.
+- **`super` is a syntax error.** `{ hi: () => super.hi() }` doesn't parse, because only methods can use `super` in an object.
+- **`__proto__` changes meaning.** `{ __proto__() {} }` defines a method, but `{ __proto__: fn }` sets the object's prototype.
+- **A class field isn't a method.** `m = () => {}` creates a new function on every instance, instead of one shared on the prototype. So `super.m()` can't reach it, and the browser never calls a custom element's `connectedCallback` if it's a field.
+
+`prefer-arrow-functions` avoids these. It keeps class methods by default, and only converts an object method that doesn't use `this`, `super`, or `arguments`. That conversion is a style choice, and [`objectMethods: false`](./docs/rules/prefer-arrow-functions.md#objectmethods) turns it off.
+
 ### What changes when you switch
 
 Even a function that needs nothing from `function` can behave a little differently as an arrow function:
@@ -240,7 +248,6 @@ Even a function that needs nothing from `function` can behave a little different
 - **Inferred types can differ.** A function that only throws is inferred as returning `void` as a declaration, and `never` as an arrow function.
 - **Published types change form.** An exported `const` arrow function appears in `.d.ts` output as `export declare const parse: (input: string) => number` instead of `export declare function parse(input: string): number`.
 - **Import cycles can break.** In an import cycle, another module can call a function declaration before its file has run. The same call to a `const` throws a `ReferenceError`.
-- **A class field isn't a method.** `m = () => {}` creates a new function on every instance, instead of one shared on the prototype. So `super.m()` can't reach it, and the browser never calls a custom element's `connectedCallback` if it's a field.
 
 ## Rules
 

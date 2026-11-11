@@ -1,6 +1,7 @@
 import type { TSESTree, TSESLint } from '@typescript-eslint/utils';
 import { createRule } from '../utils/create-rule.ts';
 import { isTypeOnlyReference } from '../utils/is-type-only-reference.ts';
+import { cannotCompleteNormally } from '../utils/cannot-complete-normally.ts';
 
 type FunctionNode = TSESTree.FunctionDeclaration | TSESTree.FunctionExpression;
 
@@ -906,6 +907,26 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 			);
 			if (new Set(parameterNames).size < parameterNames.length) {
 				return false;
+			}
+
+			// A declaration or class method that cannot complete infers `void`, not `never`
+			if (
+				(node.type === 'FunctionDeclaration' || parent.type === 'MethodDefinition')
+				&& !node.returnType
+				&& cannotCompleteNormally(node.body.body.at(-1))
+			) {
+				let hasReturn = false;
+				walk(context.sourceCode, [node.body], (child) => {
+					if (
+						child.type === 'ReturnStatement'
+						&& context.sourceCode.getScope!(child).variableScope.block === node
+					) {
+						hasReturn = true;
+					}
+				});
+				if (!hasReturn) {
+					return false;
+				}
 			}
 
 			// An arrow function class field binds `this` to the instance, like an instance method.

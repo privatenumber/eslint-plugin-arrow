@@ -299,6 +299,20 @@ log(pair.length, pair(1, 2));`,
 		changes: changesInAll(false),
 	},
 	{
+		name: 'sloppy function caller property during call',
+		sourceType: 'commonjs',
+		code: `function f() { return f.caller }
+log(f() === null);`,
+		changes: changesInAll(false),
+	},
+	{
+		name: 'sloppy function arguments property during call',
+		sourceType: 'commonjs',
+		code: `function f(value) { return f.arguments[0] }
+log(f(42));`,
+		changes: changesInAll(false),
+	},
+	{
 		name: 'generator',
 		sourceType: 'module',
 		code: `function* numbers() {

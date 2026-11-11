@@ -887,6 +887,30 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 				return false;
 			}
 
+			// A recursive return can infer `any` after converting a declaration to a `const`
+			if (node.type === 'FunctionDeclaration' && !node.returnType && node.id) {
+				const variable = context.sourceCode.getDeclaredVariables!(node).find(
+					declared => declared.identifiers.includes(node.id!),
+				);
+				if (variable?.references.some((reference) => {
+					const { identifier } = reference;
+					let expression: TSESTree.Node = identifier.parent;
+					if (expression.type !== 'CallExpression' || expression.callee !== identifier) {
+						return false;
+					}
+					if (expression.parent.type === 'ChainExpression') {
+						expression = expression.parent;
+					}
+					while (expression.parent.type === 'AwaitExpression') {
+						expression = expression.parent;
+					}
+					return expression.parent.type === 'ReturnStatement'
+						&& reference.from.variableScope.block === node;
+				})) {
+					return false;
+				}
+			}
+
 			// An arrow function class field binds `this` to the instance, like an instance method.
 			// A static arrow field binds `this` to its declaring class, even when called on a subclass
 			if (

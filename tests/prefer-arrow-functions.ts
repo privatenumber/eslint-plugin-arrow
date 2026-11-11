@@ -1293,6 +1293,10 @@ describe('prefer-arrow-functions', () => {
 					code: 'type N = never; function f(): N { throw e }',
 				},
 				{
+					name: 'never alias / value parameter with the same name',
+					code: 'type N = never; (N = 0) => { function f(): N { throw e } }',
+				},
+				{
 					name: 'never alias / transitive',
 					code: 'type N = M; type M = never; function f(): N { throw e }',
 				},

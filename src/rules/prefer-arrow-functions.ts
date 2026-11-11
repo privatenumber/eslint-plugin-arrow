@@ -432,6 +432,16 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 		// TypeScript reads `@this` from the last JSDoc comment on these hosts only
 		const hasThisTag = (node: FunctionNode) => {
 			const { parent } = node;
+
+			// TypeScript follows a defaulted assignment such as `o.f = o.f || function () {}`
+			let value: TSESTree.Node = node;
+			while (
+				value.parent?.type === 'LogicalExpression'
+				&& value.parent.right === value
+				&& (value.parent.operator === '||' || value.parent.operator === '??')
+			) {
+				value = value.parent;
+			}
 			let host: TSESTree.Node | undefined;
 			if (node.type === 'FunctionDeclaration') {
 				host = node;
@@ -446,8 +456,8 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 				&& parent.parent.declarations[0] === parent
 			) {
 				host = parent.parent;
-			} else if (parent.type === 'AssignmentExpression' && parent.right === node) {
-				let assignment = parent;
+			} else if (value.parent?.type === 'AssignmentExpression' && value.parent.right === value) {
+				let assignment = value.parent;
 				while (
 					assignment.parent.type === 'AssignmentExpression'
 					&& assignment.parent.right === assignment
@@ -905,7 +915,7 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 			if (firstParameter?.type === 'Identifier' && firstParameter.name === 'this') {
 				return false;
 			}
-			// In checked JavaScript, JSDoc `@this` becomes a disallowed arrow function parameter
+			// In checked JavaScript, a host's JSDoc `@this` on an arrow function reports TS2730
 			if (hasThisTag(node)) {
 				return false;
 			}

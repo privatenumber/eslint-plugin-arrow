@@ -1387,6 +1387,14 @@ describe('prefer-arrow-functions', () => {
 					code: '/** @this {A} */ a = b = c = function () {}',
 				},
 				{
+					name: 'JSDoc this / defaulted assignment',
+					code: '/** @this {A} */ o.f = o.f || function () {}',
+				},
+				{
+					name: 'JSDoc this / nullish defaulted assignment',
+					code: '/** @this {A} */ o.f = p ?? function () {}',
+				},
+				{
 					name: 'JSDoc this / first declarator',
 					code: '/** @this {A} */ const a = function () {}, b = 1',
 				},

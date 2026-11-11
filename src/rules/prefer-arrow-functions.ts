@@ -227,26 +227,155 @@ const getDestructuredPattern = (node: TSESTree.Node) => {
 	}
 };
 
-const isFunctionPropertyReference = (
+type UseFlags = {
+	constructed: boolean;
+	propertyRead: boolean;
+	sourceRead: boolean;
+};
+
+const classifyUse = (
 	node: TSESTree.Node,
-) => {
+): UseFlags => {
 	const { parent } = node;
 	const pattern = getDestructuredPattern(node);
+	let propertyRead = false;
+	let sourceRead = false;
 	if (pattern) {
-		return pattern.properties.some((property) => {
-			if (property.type !== 'Property') {
-				return false;
+		for (const property of pattern.properties) {
+			if (property.type === 'Property') {
+				const name = getStaticKey(property.key, property.computed);
+				propertyRead ||= name !== undefined && disallowedProperties.has(name);
+				sourceRead ||= name === 'toString';
 			}
-			const name = getStaticKey(property.key, property.computed);
-			return name !== undefined && disallowedProperties.has(name);
-		});
+		}
+	} else if (parent?.type === 'MemberExpression' && parent.object === node) {
+		const name = getPropertyName(parent);
+		propertyRead = name !== undefined && disallowedProperties.has(name);
+		sourceRead = name === 'toString';
 	}
-	if (parent?.type !== 'MemberExpression' || parent.object !== node) {
-		return false;
-	}
+	return {
+		constructed: isConstructorReference(node),
+		propertyRead,
+		sourceRead,
+	};
+};
 
-	const name = getPropertyName(parent);
-	return name !== undefined && disallowedProperties.has(name);
+const isAliasWrapper = (node: TSESTree.Node, parent: TSESTree.Node) => (
+	(parent.type === 'TSAsExpression' && parent.expression === node)
+	|| (parent.type === 'TSSatisfiesExpression' && parent.expression === node)
+	|| (parent.type === 'TSNonNullExpression' && parent.expression === node)
+	|| (parent.type === 'TSTypeAssertion' && parent.expression === node)
+	|| (parent.type === 'ConditionalExpression' && parent.test !== node)
+	|| parent.type === 'LogicalExpression'
+);
+
+// This value walk is the inverse of isAliasWrapper and also follows chained assignments
+const getAliasedIdentifiers = (
+	expression: TSESTree.Node,
+	visited: ReadonlySet<TSESTree.Node>,
+) => {
+	const identifiers: TSESTree.Identifier[] = [];
+	const traversed: TSESTree.Node[] = [];
+	const pending = [expression];
+	while (pending.length > 0) {
+		const value = pending.pop()!;
+		if (visited.has(value)) {
+			continue;
+		}
+		traversed.push(value);
+		switch (value.type) {
+			case 'Identifier': {
+				identifiers.push(value);
+				break;
+			}
+			case 'TSAsExpression':
+			case 'TSSatisfiesExpression':
+			case 'TSNonNullExpression':
+			case 'TSTypeAssertion': {
+				pending.push(value.expression);
+				break;
+			}
+			case 'LogicalExpression': {
+				pending.push(value.left, value.right);
+				break;
+			}
+			case 'ConditionalExpression': {
+				pending.push(value.consequent, value.alternate);
+				break;
+			}
+			case 'AssignmentExpression': {
+				if (value.operator === '=') {
+					if (value.left.type === 'Identifier') {
+						identifiers.push(value.left);
+					}
+					pending.push(value.right);
+				}
+				break;
+			}
+			default: {
+				break;
+			}
+		}
+	}
+	return {
+		identifiers,
+		traversed,
+	};
+};
+
+type UseSite = {
+	expression: TSESTree.Node;
+	binding?: TSESTree.Identifier;
+	next?: UseSite;
+};
+
+// Cache shared wrapper suffixes and represent assignment bindings as a linked list
+const getUseSite = (node: TSESTree.Node, cache: WeakMap<TSESTree.Node, UseSite>) => {
+	const path: TSESTree.Node[] = [];
+	let current = node;
+	while (!cache.has(current)) {
+		path.push(current);
+		const { parent } = current;
+		if (!parent || !(isAliasWrapper(current, parent) || (
+			parent.type === 'AssignmentExpression'
+			&& parent.operator === '='
+			&& parent.right === current
+			&& parent.left.type !== 'ObjectPattern'
+		))) {
+			break;
+		}
+		current = parent;
+	}
+	let site = cache.get(current);
+	while (path.length > 0) {
+		const child = path.pop()!;
+		const { parent } = child;
+		if (!site) {
+			site = {
+				expression: child,
+				binding: (
+					parent?.type === 'VariableDeclarator'
+					&& parent.init === child
+					&& parent.id.type === 'Identifier'
+				)
+					? parent.id
+					: undefined,
+			};
+		} else if (
+			parent?.type === 'AssignmentExpression'
+			&& parent.operator === '='
+			&& parent.right === child
+			&& parent.left.type === 'Identifier'
+		) {
+			site = {
+				expression: site.expression,
+				binding: parent.left,
+				next: site,
+			};
+		}
+		cache.set(child, site);
+	}
+	return site!;
 };
 
 // ESLint's default JavaScript parser does not set `decorators`
@@ -763,96 +892,106 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 			return indexed.get(target);
 		};
 
-		// Returns `undefined` when the expression references itself
-		const getExpressionReferences = (
-			node: TSESTree.FunctionExpression,
-			scope: TSESLint.Scope.Scope,
-		): TSESLint.Scope.Reference[] | undefined => {
-			const references: TSESLint.Scope.Reference[] = [];
-			// Parameters are also declared by the function, so match the function's own name exactly
-			const functionNameVariable = node.id && context.sourceCode.getDeclaredVariables!(node).find(
-				variable => variable.identifiers[0] === node.id,
-			);
-
-			if (functionNameVariable) {
-				const recursiveReference = functionNameVariable.references.some(
-					({ from }) => isInsideScope(scope, from),
-				);
-				if (recursiveReference) {
-					return;
-				}
-
-				references.push(...functionNameVariable.references);
+		const useSites = new WeakMap<TSESTree.Node, UseSite>();
+		const groups = new WeakMap<TSESLint.Scope.Variable, UseFlags>();
+		const getBindingVariable = (identifier: TSESTree.Identifier) => {
+			const { parent } = identifier;
+			if (parent.type === 'VariableDeclarator' && parent.id === identifier) {
+				return context.sourceCode.getDeclaredVariables!(parent)[0];
 			}
-
-			if (node.parent.type === 'VariableDeclarator') {
-				const [functionVariable] = context.sourceCode.getDeclaredVariables!(node.parent);
-
-				// The first reference is the variable declaration itself
-				references.push(...functionVariable.references.slice(1));
-			} else if (
-				node.parent.type === 'AssignmentExpression'
-				&& node.parent.operator === '='
-				&& node.parent.right === node
-				&& node.parent.left.type === 'Identifier'
-			) {
-				const write = getAssignmentReference(node.parent.left);
-				if (write?.resolved) {
-					references.push(...write.resolved.references.filter(reference => reference !== write));
-				}
-			}
-
-			return references;
+			return getAssignmentReference(identifier)?.resolved ?? undefined;
 		};
 
-		const isAliasWrapper = (node: TSESTree.Node, parent: TSESTree.Node) => (
-			(parent.type === 'TSAsExpression' && parent.expression === node)
-			|| (parent.type === 'TSSatisfiesExpression' && parent.expression === node)
-			|| (parent.type === 'TSNonNullExpression' && parent.expression === node)
-			|| (parent.type === 'TSTypeAssertion' && parent.expression === node)
-			|| (parent.type === 'ConditionalExpression' && parent.test !== node)
-			|| parent.type === 'LogicalExpression'
-		);
-
-		// Follows aliases: identifiers bound to the function directly or through a wrapper. Objects,
-		// arrays, destructuring, and calls are not followed (#10)
-		const someReference = (
-			references: TSESLint.Scope.Reference[],
-			predicate: (reference: TSESLint.Scope.Reference, expression: TSESTree.Node) => boolean,
-		) => {
-			const pending = [...references];
-			const visited = new Set<TSESLint.Scope.Variable>();
+		// Reassignments connect their possible values conservatively in one undirected group
+		const getGroup = (variable: TSESLint.Scope.Variable): UseFlags => {
+			const existing = groups.get(variable);
+			if (existing) {
+				return existing;
+			}
+			const group: UseFlags = {
+				constructed: false,
+				propertyRead: false,
+				sourceRead: false,
+			};
+			const pending = [variable];
+			const visitedUseSites = new Set<UseSite>();
+			const visitedWriteValues = new Set<TSESTree.Node>();
+			groups.set(variable, group);
+			const add = (next: TSESLint.Scope.Variable | null | undefined) => {
+				if (next && !groups.has(next)) {
+					groups.set(next, group);
+					pending.push(next);
+				}
+			};
 			while (pending.length > 0) {
-				const reference = pending.pop()!;
-				let current: TSESTree.Node = reference.identifier;
-				while (isAliasWrapper(current, current.parent!)) {
-					current = current.parent!;
-				}
-				if (predicate(reference, current)) {
-					return true;
-				}
-				const parent = current.parent!;
-				let variable: TSESLint.Scope.Variable | undefined;
-				if (
-					parent.type === 'VariableDeclarator'
-					&& parent.init === current
-					&& parent.id.type === 'Identifier'
-				) {
-					[variable] = context.sourceCode.getDeclaredVariables!(parent);
-				} else if (
-					parent.type === 'AssignmentExpression'
-					&& parent.operator === '='
-					&& parent.right === current
-					&& parent.left.type === 'Identifier'
-				) {
-					variable = getAssignmentReference(parent.left)?.resolved ?? undefined;
-				}
-				if (variable && !visited.has(variable)) {
-					visited.add(variable);
-					for (const aliasReference of variable.references) {
-						pending.push(aliasReference);
+				for (const reference of pending.pop()!.references) {
+					const targetParent = reference.identifier.parent;
+					const starts: TSESTree.Node[] = [reference.identifier];
+					// Connect reassigned targets to outer bindings in `c = b = a = function(){}`
+					if (
+						targetParent.type === 'AssignmentExpression'
+						&& targetParent.operator === '='
+						&& targetParent.left === reference.identifier
+					) {
+						starts.push(targetParent);
+					}
+					for (const start of starts) {
+						let site: UseSite | undefined = getUseSite(start, useSites);
+						while (site && !visitedUseSites.has(site)) {
+							visitedUseSites.add(site);
+							const use = classifyUse(site.expression);
+							group.constructed ||= use.constructed;
+							group.propertyRead ||= use.propertyRead;
+							group.sourceRead ||= use.sourceRead;
+							if (site.binding) {
+								add(getBindingVariable(site.binding));
+							}
+							site = site.next;
+						}
+					}
+					if (
+						!reference.isWrite()
+						|| !reference.writeExpr
+						|| !(
+							(
+								targetParent.type === 'VariableDeclarator'
+								&& targetParent.id === reference.identifier
+							)
+							|| (
+								targetParent.type === 'AssignmentExpression'
+								&& targetParent.operator === '='
+								&& targetParent.left === reference.identifier
+							)
+						)
+					) {
+						continue;
+					}
+					const { identifiers, traversed } = getAliasedIdentifiers(
+						reference.writeExpr,
+						visitedWriteValues,
+					);
+					for (const value of traversed) {
+						visitedWriteValues.add(value);
+					}
+					for (const identifier of identifiers) {
+						add(getAssignmentReference(identifier)?.resolved);
 					}
 				}
+			}
+			return group;
+		};
+
+		const hasUse = (node: TSESTree.Node, flag: keyof UseFlags) => {
+			let site: UseSite | undefined = getUseSite(node, useSites);
+			if (classifyUse(site.expression)[flag]) {
+				return true;
+			}
+			while (site) {
+				const variable = site.binding && getBindingVariable(site.binding);
+				if (variable && getGroup(variable)[flag]) {
+					return true;
+				}
+				site = site.next;
 			}
 			return false;
 		};
@@ -930,14 +1069,6 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 			);
 		};
 
-		const isToStringRead = (
-			node: TSESTree.Node,
-		) => (
-			node.parent?.type === 'MemberExpression'
-			&& node.parent.object === node
-			&& getPropertyName(node.parent) === 'toString'
-		);
-
 		// `toString()` returns the source text, which includes the functions inside it
 		const isInsideReadSource = (
 			node: FunctionNode,
@@ -957,27 +1088,13 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 					continue;
 				}
 
-				const variables = [
-					// Its own name, not its parameters, which are also declared by it
-					...context.sourceCode.getDeclaredVariables!(ancestor).filter(
-						variable => variable.defs.some(
-							definition => definition.node === ancestor && definition.type !== 'Parameter',
-						),
-					),
-					...(
-						ancestor.parent.type === 'VariableDeclarator'
-							? context.sourceCode.getDeclaredVariables!(ancestor.parent)
-							: []
-					),
-				];
-				if (
-					isToStringRead(ancestor)
-					|| variables.some(variable => someReference(
-						variable.references,
-						reference => isToStringRead(reference.identifier),
-					))
-				) {
+				if (hasUse(ancestor, 'sourceRead')) {
 					return true;
+				}
+				for (const variable of context.sourceCode.getDeclaredVariables!(ancestor)) {
+					if (variable.defs.some(definition => definition.node === ancestor && definition.type !== 'Parameter') && getGroup(variable).sourceRead) {
+						return true;
+					}
 				}
 			}
 			return false;
@@ -1060,14 +1177,6 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 				return false;
 			}
 
-			// Arrow functions cannot be constructed or extended, and some of their properties differ
-			if (
-				node.type === 'FunctionExpression'
-				&& (isConstructorReference(node) || isFunctionPropertyReference(node))
-			) {
-				return false;
-			}
-
 			// TypeScript only applies `asserts` and `never` return types to control flow analysis
 			// when the callee is a function declaration or an explicitly annotated variable
 			const returnType = node.returnType?.typeAnnotation;
@@ -1095,15 +1204,31 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 				return false;
 			}
 
-			const references = (
-				node.type === 'FunctionDeclaration'
-					? getDeclarationReferences(node)
-					: getExpressionReferences(node, scope)
-			);
+			if (node.type === 'FunctionDeclaration') {
+				if (getDeclarationReferences(node) === undefined) {
+					return false;
+				}
+				const variable = node.id && context.sourceCode.getDeclaredVariables!(node)[0];
+				if (variable) {
+					const group = getGroup(variable);
+					return !group.constructed && !group.propertyRead;
+				}
+				return true;
+			}
 
-			return references !== undefined && !someReference(references, (_reference, expression) => (
-				isConstructorReference(expression) || isFunctionPropertyReference(expression)
-			));
+			const ownVariable = node.id && context.sourceCode.getDeclaredVariables!(node).find(
+				variable => variable.identifiers[0] === node.id,
+			);
+			if (ownVariable) {
+				if (ownVariable.references.some(({ from }) => isInsideScope(scope, from))) {
+					return false;
+				}
+				const group = getGroup(ownVariable);
+				if (group.constructed || group.propertyRead) {
+					return false;
+				}
+			}
+			return !hasUse(node, 'constructed') && !hasUse(node, 'propertyRead');
 		};
 
 		// In TSX, `<T>(` parses as a JSX element unless the type parameter list has a trailing comma

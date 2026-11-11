@@ -2090,6 +2090,15 @@ describe('prefer-arrow-functions', () => {
 					'function f(){} const { ["prototype"]: c } = x || f',
 					'function f(){} const { [`prototype`]: c } = f',
 					'function f(){} f[`prototype`]',
+					'const a = true ? function(){} : Object; const b = a; new b()',
+					'new (true ? function(){} : Object)()',
+					'function a(){} let b; const c = b = a; new c()',
+					'let a, b; const c = b = a = function(){}; a = function(){}; new c()',
+					'function a(){ return function(){} } const b = a; (b || Object).toString()',
+					'function a(){ return function(){} } const b = a; const { toString } = b',
+					'let a; a = function(){ return function(){} }; const b = a; b.toString()',
+					// Reassignments connect both functions to the same conservative alias group.
+					'function f(){} function g(){} let a = f; a = g; new a()',
 				].map(code => ({ code })),
 				{
 					name: 'aliases / declaration new',
@@ -2230,6 +2239,8 @@ describe('prefer-arrow-functions', () => {
 						'function f(){} (f satisfies any).prototype',
 						'function f(){} (<any>f).prototype',
 						'function f(){} const { name } = f as any',
+						'const a = (function(){} as any); const b = a; new b()',
+						'new (function(){} as any)()',
 					].map(code => ({ code })),
 					{
 						name: 'aliases / as',

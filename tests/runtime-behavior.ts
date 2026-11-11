@@ -738,6 +738,13 @@ function helper() { return 'deferred' }
 log(run());`,
 		changes: changesInAll(true, { preferArrowFunctions: false }),
 	},
+	{
+		name: 'direct eval reads arguments',
+		sourceType: 'module',
+		code: `function f(a) { return eval('arguments[0]') }
+log(f(42));`,
+		changes: changesInAll(false),
+	},
 ];
 
 describe('runtime behavior', () => {

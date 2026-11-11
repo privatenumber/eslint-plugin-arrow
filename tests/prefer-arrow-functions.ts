@@ -1876,4 +1876,75 @@ describe('prefer-arrow-functions', () => {
 			eslintRuleTester.run('prefer-arrow-functions', preferArrowFunctions as unknown as Rule.RuleModule, cases);
 		});
 	});
+
+	describe('direct eval', () => {
+		const errors = [{ messageId: 'preferArrowFunction' as const }];
+		const cases = {
+			valid: [
+				{
+					name: 'declaration / arguments',
+					code: "function a(b){ return eval('arguments[0]') }",
+				},
+				{
+					name: 'expression / this',
+					code: "const a = function(){ return eval('this') }",
+				},
+				{
+					name: 'object method / super',
+					code: "({ a(){ return eval('super.x') } })",
+					options: [{ objectMethods: true }] as [{ objectMethods: boolean }],
+				},
+				{
+					name: 'nested arrow',
+					code: "function a(){ return () => eval('arguments[0]') }",
+				},
+				{
+					name: 'nested function',
+					code: "function a(){ function b(){ return eval('arguments[0]') } return b() }",
+				},
+				{
+					name: 'parenthesized callee',
+					code: "function a(){ return (eval)('arguments[0]') }",
+				},
+			],
+			invalid: [
+				{
+					name: 'indirect / sequence',
+					code: "function a(){ return (0, eval)('1') }",
+					errors,
+					output: "const a = () => { return (0, eval)('1') }",
+				},
+				{
+					name: 'indirect / member',
+					code: "function a(){ return globalThis.eval('1') }",
+					errors,
+					output: "const a = () => { return globalThis.eval('1') }",
+				},
+				{
+					name: 'indirect / optional',
+					code: "function a(){ return eval?.('1') }",
+					errors,
+					output: "const a = () => { return eval?.('1') }",
+				},
+				{
+					name: 'shadowed eval',
+					code: "function a(){ const eval = (x) => x; return eval('1') }",
+					languageOptions: {
+						sourceType: 'commonjs',
+						parserOptions: { sourceType: 'commonjs' },
+					} as const,
+					errors,
+					output: "const a = () => { const eval = (x) => x; return eval('1') }",
+				},
+			],
+		};
+
+		describe('typescript parser', () => {
+			ruleTester.run('prefer-arrow-functions', preferArrowFunctions, cases);
+		});
+		describe('javascript parser', () => {
+			const eslintRuleTester = new EslintRuleTester();
+			eslintRuleTester.run('prefer-arrow-functions', preferArrowFunctions as unknown as Rule.RuleModule, cases);
+		});
+	});
 });

@@ -931,6 +931,17 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 				return false;
 			}
 
+			// Direct eval can use these bindings; nested regular functions are conservatively included
+			if (scope.through.some(({ identifier, resolved }) => (
+				(!resolved || (resolved.scope.type === 'global' && resolved.defs.length === 0))
+				&& identifier.name === 'eval'
+				&& identifier.parent.type === 'CallExpression'
+				&& identifier.parent.callee === identifier
+				&& !identifier.parent.optional
+			))) {
+				return false;
+			}
+
 			const references = (
 				node.type === 'FunctionDeclaration'
 					? getDeclarationReferences(node)

@@ -110,7 +110,31 @@ Mutation results: removing the recursion fails the four `hoisting / through ...`
 
 Found in mochajs/mocha and acornjs/acorn. The rule skipped functions whose `.name`, `.length`, or `.prototype` was read through a variable, but not when read directly on the expression: `function foo() {}.name === 'foo'` became `(() => {}).name === 'foo'`, which is `false`. mocha used that expression to detect function name support, so four tests started to skip. acorn's tests passed `(function () {...}).toString()` to its parser, and the arrow function source failed to parse with `ecmaVersion: 5`.
 
-**Decision:** the rule checks property reads on the expression too, and `toString` joined the checked properties, because an arrow function's source text differs. Code that calls `toString()` on a function passed in from elsewhere remains undetectable, and the rule docs warn about it.
+**Decision:** the rule checks property reads on the expression too, and `toString` joined the checked properties, because an arrow function's source text differs. [Which function properties the rule checks](#which-function-properties-the-rule-checks) revises the list. Code that calls `toString()` on a function passed in from elsewhere remains undetectable, and the rule docs warn about it.
+
+## Which function properties the rule checks
+
+Issues [#2](https://github.com/privatenumber/eslint-plugin-arrow/issues/2) and [#8](https://github.com/privatenumber/eslint-plugin-arrow/issues/8). The checked list was `prototype`, `name`, `length`, and `toString`. [../ecmascript/function-properties.md](../ecmascript/function-properties.md) measured every property on every form the fix produces, in V8 and JavaScriptCore.
+
+**Decision:** the list becomes `prototype`, `name`, `toString`, `caller`, and `arguments`.
+
+- Add `caller` and `arguments`. A sloppy `function` returns `null` or a value, and every other form throws `TypeError`. The rule skips them in strict code too: a read of `f.caller` is rare, so the skip costs almost nothing, and the rule does not need a second strictness check.
+- Remove `length`. It was `2` for every form of `f(a, b) {}`, so reading it never changes behavior. This is the only change in the list that converts more code.
+- Keep `name`. Every form keeps the name by default, but `namedFunctionExpressions: true` is documented to change it, and the check protects that opt-in.
+
+## Constructor use through an alias
+
+Issue [#7](https://github.com/privatenumber/eslint-plugin-arrow/issues/7). The rule skips a function used with `new`, `instanceof`, or `extends`, or whose properties are read, but only through its own name. `const B = A; new B()` converted `A`, and threw `TypeError: B is not a constructor`. Biome has open reports of related gaps in `useArrowFunction`: [biomejs/biome#12372](https://github.com/biomejs/biome/issues/12372) (`.prototype` read) and [biomejs/biome#9585](https://github.com/biomejs/biome/issues/9585) (`vi.fn(function () {})` called with `new`).
+
+**Decision:** follow simple aliases, and apply the constructor and property checks to each alias's references. An alias is a variable whose declarator initializer, or the right side of an assignment to it, is a reference to the function, optionally through:
+
+- a TypeScript wrapper: `as`, `satisfies`, `!`, or `<T>`
+- a branch of a conditional expression
+- an operand of `&&`, `||`, or `??`
+
+Aliases of aliases are followed, with a visited set, so each reference is visited at most once and the check stays O(references) per function.
+
+Not followed, and documented as limits: objects and arrays (`{ A }`, `[A]`), destructuring, function arguments (`vi.fn(A)`, `Reflect.construct(A, [])`), and returns. Each would need to follow values through data structures or calls, which needs data flow analysis. The call argument case has its own issue, because Biome #9585 shows it in real test code.
 
 ## Checked and unchanged
 

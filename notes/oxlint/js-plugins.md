@@ -2,6 +2,8 @@
 
 Oxlint runs this package as a JS plugin with no Oxlint-specific code. Both rules report, accept options, and apply fixes. Unlike ESLint, one `oxlint --fix` run applies one pass of fixes, so code that needs several dependent fixes needs several runs.
 
+Code path events work, but they cost more than in ESLint: see [Code path analysis has a cost](#code-path-analysis-has-a-cost).
+
 Last verified: 2026-10-31 with Oxlint 1.90.0.
 
 ## Documented support
@@ -93,3 +95,22 @@ Observed with Oxlint 1.90.0, in a project with this package symlinked at `node_m
 Upstream declined package resolution in `.oxlintrc.json`. [oxc-project/oxc#15538](https://github.com/oxc-project/oxc/issues/15538) ("support `extends` config from `node_modules`") was closed as not planned on 2026-07-13, with a maintainer pointing to `oxlint.config.ts` instead. [oxc-project/oxc#19479](https://github.com/oxc-project/oxc/pull/19479), which would have resolved package specifiers, was closed unmerged on 2026-02-17. So the README leads with `oxlint.config.ts`, and the `./node_modules` path is the fallback for JSON configs.
 
 Oxlint's `defineConfig` rejects rule severities typed as `string`, which is how TypeScript types a JSON import. [`src/oxlint.ts`](../../src/oxlint.ts) types them as `'off' | 'warn' | 'error'`, and [tests/oxlint.ts](../../tests/oxlint.ts) type-checks a `defineConfig` call against the export.
+
+## Code path analysis has a cost
+
+A JS plugin rule can subscribe to code path events such as `onCodePathEnd`, as in ESLint. In Oxlint, the subscription costs time even when the handler does nothing. In ESLint, it added no measurable time, which is consistent with ESLint always analyzing code paths. The cause inside Oxlint was not investigated.
+
+Last verified: 2026-11-11 with Oxlint 1.90.0 and ESLint 10.13.0.
+
+The corpus was 1,684 compiled JavaScript and TypeScript files (13 MB) copied from this repository's `node_modules`: ESLint 9 and 10, typescript-eslint 8.72, semver, minimatch, espree, acorn, and esquery. Each config ran 5 times, alternating, with `oxlint -c <config> --threads 1 corpus`:
+
+| Rules | Wall time (s) |
+| --- | --- |
+| Empty `FunctionDeclaration` handler | 0.56, 0.57, 0.59, 0.59, 0.63 |
+| The same, plus an `onCodePathEnd` handler that reads `returnedSegments` | 0.79, 0.82, 0.82, 0.85, 0.85 |
+| `arrow/prefer-arrow-functions` from `dist/` | 0.95, 0.97, 1.02, 1.44, 1.52 |
+| `arrow/prefer-arrow-functions` plus the code path rule | 1.14, 1.18, 1.24, 1.24, 1.28 |
+
+So code path analysis adds about 0.2 s to this corpus, or about 20% of this plugin's runtime. In ESLint, 4 runs of `Linter#verify` over the JavaScript files took 2,241 to 2,556 ms with the plugin alone and 2,243 to 2,303 ms with the code path rule added, so there is no measurable difference.
+
+[../eslint-plugin-arrow/type-safety.md](../eslint-plugin-arrow/type-safety.md#9-functions-that-only-throw) records the decision this measurement supports.

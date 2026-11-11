@@ -438,7 +438,7 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 			return declaration?.type === 'TSTypeAliasDeclaration' ? declaration : undefined;
 		};
 
-		// Cache each alias's direct queries and dependencies so its syntax is walked once per file
+		// Cache each alias's direct queries and dependencies, so its contents are scanned once per file
 		const aliasContents = new Map<TSESTree.TSTypeAliasDeclaration, {
 			queries: Set<TSESLint.Scope.Variable>;
 			aliases: TSESTree.TSTypeAliasDeclaration[];

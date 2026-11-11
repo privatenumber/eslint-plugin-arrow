@@ -16,8 +16,6 @@ Unless a section says otherwise, each experiment is one file checked with `tsc -
 
 When a function's signature reads `typeof value`, and `value`'s inferred type comes from an initializer that uses the function, the converted `const` and `value` need each other's types. TypeScript can then report an implicit `any` cycle. `prefer-arrow-functions` keeps these functions as declarations.
 
-Last verified: 2026-11-04, TypeScript 6.0.3.
-
 ### The pattern
 
 <!-- eslint-skip -->

@@ -45,7 +45,7 @@ Its source at commit `d65cd04` ([`getConstructorUsages`](https://github.com/Jami
 
 - [eslint-plugin-prefer-arrow](https://github.com/TristonJ/eslint-plugin-prefer-arrow) 1.2.3 reported every input in our run but fixed none of them.
 - ESLint's [`prefer-arrow-callback`](https://eslint.org/docs/latest/rules/prefer-arrow-callback) and Biome's `useArrowFunction` fix function expressions only, not declarations or methods. See [../biome/plugins.md](../biome/plugins.md).
-- Biome's `useArrowFunction` skips a function expression that is directly the callee of `new` or an `extends` clause, and has two open reports of constructor use it misses: [biomejs/biome#12372](https://github.com/biomejs/biome/issues/12372) (`.prototype` access) and [biomejs/biome#9585](https://github.com/biomejs/biome/issues/9585) (`vi.fn(function () {})` called with `new`). See [runtime-safety.md](./runtime-safety.md#constructor-use-through-an-alias).
+- Biome's `useArrowFunction` skips a function expression that is directly the callee of `new` or an `extends` clause, and has two open reports of constructor use it misses: [biomejs/biome#12372](https://github.com/biomejs/biome/issues/12372) (`.prototype` access) and [biomejs/biome#9585](https://github.com/biomejs/biome/issues/9585) (`vi.fn(function () {})` called with `new`).
 - ESLint's and Oxlint's `func-style` and Biome's `useConsistentFunctionStyle` can report function declarations, but none of them fix them. Oxlint's [`func-style`](https://oxc.rs/docs/guide/usage/linter/rules/eslint/func-style) docs say an autofix is "planned, but not implemented".
 
 ## `no-function-hoisting`

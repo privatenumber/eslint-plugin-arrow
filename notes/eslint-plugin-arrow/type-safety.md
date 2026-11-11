@@ -51,12 +51,12 @@ A JSDoc `@returns {never}` in JavaScript does not need a skip: the arrow functio
 - a function declaration. When it is exported, both the comment before `export` and the comment between `export default` and `function` count, because the default export fix moves the export after the new `const`, which turns the inner comment into a tag on the arrow function.
 - a variable statement whose first declarator has the function as its initializer. TypeScript attaches the statement's JSDoc to the first declarator only.
 - an assignment statement whose right side is the function, through any chain such as `a = b = function () {}`
-- a class field whose value is the function. A comment on the same line as the field did not report TS2730, and one on the line before it did; the skip ignores placement.
+- a class field whose value is the function. TypeScript's result depends on where the comment is ([observed](../typescript/jsdoc-this.md#observed)); the skip ignores placement.
 - a class method, under `classMethods`
 
 Object properties, object methods, and call arguments convert. TypeScript still reads the tag there, but converting them did not report TS2730.
 
-The tag match is a plain `@this` word match, which also skips a comment that only mentions `@this` in backticks. TypeScript parses tags mid-line too, so a start-of-line match would miss real tags. An independent review of #6 found the first declarator, class field, chained assignment, and default export cases.
+The tag match is a plain `@this` word match, which also skips a comment that only mentions `@this` in backticks. TypeScript parses tags mid-line too, so a start-of-line match would miss real tags.
 
 The skip applies to every file type, not only `.js` files with `checkJs`. A TypeScript file ignores the tag, so the skip only costs a conversion there, and the rule cannot see `checkJs`.
 
@@ -75,7 +75,7 @@ Cost, measured on the [corpus](#corpus): 106 of 4,910 named function declaration
 **Decision:** skip a function declaration, or a class method under `classMethods`, that has no return type annotation and no `return` statement, and whose body cannot complete normally. The check is syntactic:
 
 - `throw` cannot complete.
-- A block, including the function body, cannot complete when any of its statements cannot, because the statements after it are unreachable. `break` and `continue` only occur inside loops, `switch`, and labeled statements, which count as completing, so they cannot make an earlier statement complete.
+- A block, including the function body, cannot complete when any of its statements cannot, because the statements after it are unreachable. Loops, `switch`, and labeled statements always count as completing (see the limits below), so a `break` or `continue` inside them cannot change this.
 - `if` cannot complete when it has an `else` and neither branch can.
 - `try` cannot complete when its `finally` cannot, or when its block cannot and its `catch`, if any, cannot.
 - `if` with the literal test `true` cannot complete when its consequent cannot, and with `false`, when its `else` cannot. TypeScript 6.0.3 treats these tests as constant: `function f() { if (true) throw e }` infers `void` and its arrow function infers `never`. Other constant tests, such as `if (1)`, infer `void` in both forms. Tests that TypeScript narrows to `true`, such as `x || true`, are a limit.

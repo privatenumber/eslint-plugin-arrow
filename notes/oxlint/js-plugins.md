@@ -104,7 +104,7 @@ Last verified: 2026-11-11 with Oxlint 1.90.0 and ESLint 10.13.0.
 
 ### Setup
 
-The corpus was 1,684 compiled JavaScript and TypeScript files (13 MB) copied from this repository's `node_modules`: ESLint 9 and 10, typescript-eslint 8.72, semver, minimatch, espree, acorn, and esquery.
+The corpus is the one described in [../eslint-plugin-arrow/type-safety.md](../eslint-plugin-arrow/type-safety.md#corpus) (13 MB).
 
 `perf/plugin.mjs` defines three probe rules:
 

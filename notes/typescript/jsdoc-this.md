@@ -10,7 +10,7 @@ Last verified: 2026-11-11, TypeScript 6.0.3.
 
 ## Observed
 
-Each row puts `/** @this {{ a: number }} */` on the line before the function. Checked with `tsc --strict --noEmit --target es2022 --lib es2022 --allowJs --checkJs a.js` for the declaration rows, and in memory with the same options for the others:
+Unless a row says otherwise, each row puts `/** @this {{ a: number }} */` on the line before the function. Checked with `tsc --strict --noEmit --target es2022 --lib es2022 --allowJs --checkJs a.js` for the declaration rows, and in memory with the same options for the others:
 
 | Host | `function` form | Arrow function form |
 | --- | --- | --- |
@@ -20,15 +20,16 @@ Each row puts `/** @this {{ a: number }} */` on the line before the function. Ch
 | Second declarator, `export const a = 1, b = function () {}` | ok | ok |
 | Assignment, `o.f = function () {}` | ok | TS2730 |
 | Chained assignment, `a = b = function () {}` | ok | TS2730 |
-| Class method, `f() {}` and field `f = () => {}` | ok | TS2730 |
+| Class method, `f() {}` | ok | TS2730 |
+| Class field, comment on the line before `f = function () {}` | ok | TS2730 |
+| Class field, comment on the same line, `class A { /** @this ... */ f = function () {} }` | ok | ok |
+| Default export, comment between `export default` and `function` | ok | TS2730 after the fix moves the export to `export default f` |
 | Object property, `f: function () {}` | ok | ok |
 | Object method, `f() {}` and property `f: () => {}` | ok | ok |
 | Call argument, `map(/** @this ... */ function () {})` | ok | ok |
 | The tag is in a JSDoc comment followed by a second JSDoc comment | ok | ok |
 | The tag is in a `/* */` comment, not `/** */` | ok | ok |
 | A TypeScript file, `export const f = () => {}` | n/a | ok |
-
-The placement of a comment matters: `class A { /** @this {{a: number}} */ f = () => {} }` reports no error, but putting the comment on the next line reports TS2730. For a default export, `export default /** @this {{a: number}} */ function f(){}` checks successfully, while moving the comment before `const f = () => {}; export default f;` reports TS2730. These examples were checked with TypeScript 6.0.3 using `tsc --ignoreConfig --allowJs --checkJs --strict --noEmit --skipLibCheck`.
 
 Tags are not limited to the start of a comment line: `/** Example: @this {{a: number}} placeholder */ const f = () => {}` reports TS2730. The same example with the tag enclosed in backticks reports no error. The [JSDoc parser](https://github.com/microsoft/TypeScript/blob/v6.0.3/src/compiler/parser.ts) scans comment text and parses tags rather than using line starts alone.
 

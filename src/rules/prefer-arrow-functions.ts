@@ -1,6 +1,7 @@
 import type { TSESTree, TSESLint } from '@typescript-eslint/utils';
 import { createRule } from '../utils/create-rule.ts';
 import { isTypeOnlyReference } from '../utils/is-type-only-reference.ts';
+import { cannotCompleteNormally } from '../utils/cannot-complete-normally.ts';
 
 type FunctionNode = TSESTree.FunctionDeclaration | TSESTree.FunctionExpression;
 
@@ -906,6 +907,28 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 			);
 			if (new Set(parameterNames).size < parameterNames.length) {
 				return false;
+			}
+
+			// A non-completing declaration or class method without a return type annotation or own return
+			// infers `void` (`Promise<void>` if async), but an arrow infers `never` (`Promise<never>`).
+			// A JSDoc `@returns` type prevents this. The rule does not read JSDoc, so it skips those too
+			if (
+				(node.type === 'FunctionDeclaration' || parent.type === 'MethodDefinition')
+				&& !node.returnType
+				&& cannotCompleteNormally(node.body)
+			) {
+				let hasReturn = false;
+				walk(context.sourceCode, [node.body], (child) => {
+					if (
+						child.type === 'ReturnStatement'
+						&& context.sourceCode.getScope!(child).variableScope.block === node
+					) {
+						hasReturn = true;
+					}
+				});
+				if (!hasReturn) {
+					return false;
+				}
 			}
 
 			// An arrow function class field binds `this` to the instance, like an instance method.

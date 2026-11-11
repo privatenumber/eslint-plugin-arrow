@@ -1826,6 +1826,154 @@ describe('prefer-arrow-functions', () => {
 		});
 	});
 
+	describe('non-completing functions', () => {
+		const errors = [{ messageId: 'preferArrowFunction' as const }];
+		const classOptions: [{ classMethods: boolean }] = [{ classMethods: true }];
+		const cases = {
+			valid: [
+				{
+					name: 'non-completing / throw',
+					code: 'export function f() { throw 1 }',
+				},
+				{
+					name: 'non-completing / async',
+					code: 'async function f() { throw 1 }',
+				},
+				{
+					name: 'non-completing / branches',
+					code: 'function f() { if (x) throw 1; else throw 2 }',
+				},
+				{
+					name: 'non-completing / trailing statement in branch',
+					code: 'function f() { if (x) { throw 1; ; } else { throw 2 } }',
+				},
+				{
+					name: 'non-completing / trailing statement in body',
+					code: 'function f() { throw 1; foo() }',
+				},
+				{
+					name: 'non-completing / true literal',
+					code: 'function f() { if (true) throw 1 }',
+				},
+				{
+					name: 'non-completing / false literal',
+					code: 'function f() { if (false) {} else throw 1 }',
+				},
+				{
+					name: 'non-completing / nested block',
+					code: 'function f() { { { throw 1 } } }',
+				},
+				{
+					name: 'non-completing / finally',
+					code: 'function f() { try {} finally { throw 1 } }',
+				},
+				{
+					name: 'non-completing / try',
+					code: 'function f() { try { throw 1 } finally {} }',
+				},
+				{
+					name: 'non-completing / try and catch',
+					code: 'function f() { try { throw 1 } catch (e) { throw 2 } }',
+				},
+				{
+					name: 'non-completing / nested return',
+					code: 'function f() { const g = () => { return 1 }; throw 1 }',
+				},
+				{
+					name: 'non-completing / method',
+					code: 'class C { f() { throw 1 } }',
+					options: classOptions,
+				},
+			],
+			invalid: [
+				{
+					name: 'non-completing / labeled break',
+					code: 'function f() { l: { if (x) break l; throw 1 } }',
+					output: 'const f = () => { l: { if (x) break l; throw 1 } }',
+					errors,
+				},
+				{
+					name: 'non-completing / numeric literal',
+					code: 'function f() { if (1) throw 1 }',
+					output: 'const f = () => { if (1) throw 1 }',
+					errors,
+				},
+				{
+					name: 'non-completing / missing else',
+					code: 'function f() { if (x) throw 1 }',
+					output: 'const f = () => { if (x) throw 1 }',
+					errors,
+				},
+				{
+					name: 'non-completing / one branch completes',
+					code: 'function f() { if (x) throw 1; else {} }',
+					output: 'const f = () => { if (x) throw 1; else {} };',
+					errors,
+				},
+				{
+					name: 'non-completing / return before throw',
+					code: 'function f() { if (x) return; throw 1 }',
+					output: 'const f = () => { if (x) return; throw 1 }',
+					errors,
+				},
+				{
+					name: 'non-completing / unreachable return',
+					code: 'function f() { if (false) return; throw 1 }',
+					output: 'const f = () => { if (false) return; throw 1 }',
+					errors,
+				},
+				{
+					name: 'non-completing / catch completes',
+					code: 'function f() { try { throw 1 } catch (e) {} }',
+					output: 'const f = () => { try { throw 1 } catch (e) {} }',
+					errors,
+				},
+				{
+					name: 'non-completing / empty',
+					code: 'function f() {}',
+					output: 'const f = () => {}',
+					errors,
+				},
+				// Loops are intentionally outside the syntactic completion check.
+				{
+					name: 'non-completing / infinite loop',
+					code: 'function f() { while (true) {} }',
+					output: 'const f = () => { while (true) {} }',
+					errors,
+				},
+				{
+					name: 'non-completing / expression',
+					code: 'const f = function() { throw 1 }',
+					output: 'const f = () => { throw 1 }',
+					errors,
+				},
+				{
+					name: 'non-completing / object method',
+					code: '({ f() { throw 1 } })',
+					output: '({ f: () => { throw 1 } })',
+					errors,
+				},
+			],
+		};
+		describe('typescript parser', () => {
+			ruleTester.run('prefer-arrow-functions', preferArrowFunctions, cases);
+			ruleTester.run('prefer-arrow-functions', preferArrowFunctions, {
+				valid: [],
+				invalid: [{
+					name: 'non-completing / annotated',
+					code: 'function f(): void { throw 1 }',
+					output: 'const f = (): void => { throw 1 }',
+					errors,
+				}],
+			});
+		});
+		describe('javascript parser', () => {
+			EslintRuleTester.describe = describe;
+			EslintRuleTester.it = test;
+			new EslintRuleTester().run('prefer-arrow-functions', preferArrowFunctions as unknown as Rule.RuleModule, cases);
+		});
+	});
+
 	// JavaScript files use ESLint's parser and scope manager, which omit TypeScript-only properties
 	describe('javascript parser', () => {
 		EslintRuleTester.describe = describe;

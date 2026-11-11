@@ -186,6 +186,9 @@ const getStaticKey = (
 	key: TSESTree.Node,
 	computed: boolean,
 ) => {
+	if (computed) {
+		key = unwrapTypeScriptExpression(key);
+	}
 	if (!computed && key.type === 'Identifier') {
 		return key.name;
 	}
@@ -286,9 +289,10 @@ const isAliasWrapper = (node: TSESTree.Node, parent: TSESTree.Node) => (
 	|| (parent.type === 'TSInstantiationExpression' && parent.expression === node)
 	|| (parent.type === 'ConditionalExpression' && parent.test !== node)
 	|| parent.type === 'LogicalExpression'
+	|| (parent.type === 'SequenceExpression' && parent.expressions.at(-1) === node)
 );
 
-const unwrapAssignmentTarget = (target: TSESTree.Node) => {
+const unwrapTypeScriptExpression = (target: TSESTree.Node): TSESTree.Node => {
 	while (
 		target.type === 'TSAsExpression'
 		|| target.type === 'TSSatisfiesExpression'
@@ -298,7 +302,7 @@ const unwrapAssignmentTarget = (target: TSESTree.Node) => {
 	) {
 		target = target.expression;
 	}
-	return target.type === 'Identifier' ? target : undefined;
+	return target;
 };
 
 // This value walk is the inverse of isAliasWrapper and also follows chained assignments
@@ -336,10 +340,14 @@ const getAliasedIdentifiers = (
 				pending.push(value.consequent, value.alternate);
 				break;
 			}
+			case 'SequenceExpression': {
+				pending.push(value.expressions.at(-1)!);
+				break;
+			}
 			case 'AssignmentExpression': {
 				if (value.operator === '=') {
-					const target = unwrapAssignmentTarget(value.left);
-					if (target) {
+					const target = unwrapTypeScriptExpression(value.left);
+					if (target.type === 'Identifier') {
 						identifiers.push(target);
 					}
 					pending.push(value.right);
@@ -394,15 +402,21 @@ const getUseSite = (node: TSESTree.Node, cache: WeakMap<TSESTree.Node, UseSite>)
 					&& parent.id.type === 'Identifier'
 				)
 					? parent.id
-					: undefined,
+					: ((
+						parent?.type === 'AssignmentPattern'
+						&& parent.right === child
+						&& parent.left.type === 'Identifier'
+					)
+						? parent.left
+						: undefined),
 			};
 		} else if (
 			parent?.type === 'AssignmentExpression'
 			&& parent.operator === '='
 			&& parent.right === child
 		) {
-			const binding = unwrapAssignmentTarget(parent.left);
-			if (binding) {
+			const binding = unwrapTypeScriptExpression(parent.left);
+			if (binding.type === 'Identifier') {
 				site = {
 					expression: site.expression,
 					binding,
@@ -945,6 +959,9 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 			if (parent.type === 'VariableDeclarator' && parent.id === identifier) {
 				return context.sourceCode.getDeclaredVariables!(parent)[0];
 			}
+			if (parent.type === 'AssignmentPattern' && parent.left === identifier) {
+				return context.sourceCode.getScope!(identifier).set.get(identifier.name);
+			}
 			return getAssignmentReference(identifier)?.resolved ?? undefined;
 		};
 
@@ -1015,6 +1032,10 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 							|| (
 								targetParent.type === 'AssignmentExpression'
 								&& targetParent.operator === '='
+								&& targetParent.left === target
+							)
+							|| (
+								targetParent.type === 'AssignmentPattern'
 								&& targetParent.left === target
 							)
 						)

@@ -1125,6 +1125,64 @@ describe('prefer-arrow-functions', () => {
 		],
 	});
 
+	describe('function property reads', () => {
+		const cases = {
+			valid: [
+				{
+					name: 'caller property / declaration',
+					code: 'function a(){} a.caller',
+				},
+				{
+					name: 'arguments property / declaration',
+					code: 'function a(){} a.arguments',
+				},
+				{
+					name: 'caller property / computed',
+					code: "function a(){} a['caller']",
+				},
+				{
+					name: 'arguments property / computed',
+					code: "function a(){} a['arguments']",
+				},
+				{
+					name: 'caller property / direct expression',
+					code: '(function(){}).caller',
+				},
+				{
+					name: 'arguments property / direct expression',
+					code: '(function(){}).arguments',
+				},
+				{
+					name: 'caller property / expression binding',
+					code: 'const b = function(){}; b.caller',
+				},
+				{
+					name: 'arguments property / expression binding',
+					code: 'const b = function(){}; b.arguments',
+				},
+				{
+					name: 'arguments identifier / function body',
+					code: 'function a(){ return arguments }',
+				},
+			],
+			invalid: [{
+				name: 'call property / declaration remains convertible',
+				code: 'function a(){} a.call',
+				errors: [{ messageId: 'preferArrowFunction' as const }],
+				output: 'const a = () => {}; a.call',
+			}],
+		};
+
+		describe('typescript parser', () => {
+			ruleTester.run('prefer-arrow-functions', preferArrowFunctions, cases);
+		});
+		describe('javascript parser', () => {
+			EslintRuleTester.describe = describe;
+			EslintRuleTester.it = test;
+			new EslintRuleTester().run('prefer-arrow-functions', preferArrowFunctions as unknown as Rule.RuleModule, cases);
+		});
+	});
+
 	describe('options', () => {
 		ruleTester.run('prefer-arrow-functions', preferArrowFunctions, {
 			valid: [

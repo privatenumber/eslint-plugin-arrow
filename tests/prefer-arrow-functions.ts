@@ -2080,6 +2080,17 @@ describe('prefer-arrow-functions', () => {
 		const errors = [{ messageId: 'preferArrowFunction' as const }];
 		const cases = {
 			valid: [
+				...[
+					'function f(){} new (x ? f : y)()',
+					'function f(){} (x || f).name',
+					'let f; f = function(){}; new f()',
+					'let f; f = function(){}; f.name',
+					'function f(){} const { prototype } = f',
+					'function f(){} let name; ({ name } = f)',
+					'function f(){} const { ["prototype"]: c } = x || f',
+					'function f(){} const { [`prototype`]: c } = f',
+					'function f(){} f[`prototype`]',
+				].map(code => ({ code })),
 				{
 					name: 'aliases / declaration new',
 					code: 'function a(){} const b = a; new b()',
@@ -2146,6 +2157,17 @@ describe('prefer-arrow-functions', () => {
 				},
 			],
 			invalid: [
+				...[
+					['function f(){} const { call } = f', 'const f = () => {}; const { call } = f'],
+					['function f(){} const { [k]: v } = f', 'const f = () => {}; const { [k]: v } = f'],
+					['function f(){} const { ...rest } = f', 'const f = () => {}; const { ...rest } = f'],
+					['o.f = function(){}', 'o.f = () => {}'],
+					['let f; f = function(){}; f()', 'let f; f = () => {}; f()'],
+				].map(([code, output]) => ({
+					code,
+					output,
+					errors,
+				})),
 				{
 					name: 'aliases / nested function source not read',
 					code: 'const a = () => { return function(){} }; const b = a; b()',
@@ -2201,6 +2223,14 @@ describe('prefer-arrow-functions', () => {
 			ruleTester.run('prefer-arrow-functions', preferArrowFunctions, cases);
 			ruleTester.run('typescript alias wrappers', preferArrowFunctions, {
 				valid: [
+					...[
+						'function f(){} new (f as any)()',
+						'function f(){} (f as any).name',
+						'function f(){} f!.name',
+						'function f(){} (f satisfies any).prototype',
+						'function f(){} (<any>f).prototype',
+						'function f(){} const { name } = f as any',
+					].map(code => ({ code })),
 					{
 						name: 'aliases / as',
 						code: 'function a(){} const b = a as typeof a; new b()',

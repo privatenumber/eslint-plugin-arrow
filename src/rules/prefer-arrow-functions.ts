@@ -165,9 +165,9 @@ const acceptsAssignmentExpression = (
 };
 
 const isConstructorReference = (
-	node: TSESTree.Identifier | TSESTree.JSXIdentifier | TSESTree.FunctionExpression,
+	node: TSESTree.Node,
 ) => {
-	const { parent } = node;
+	const parent = node.parent!;
 	return (
 		(parent.type === 'NewExpression' && parent.callee === node)
 		|| (
@@ -182,25 +182,66 @@ const isConstructorReference = (
 	);
 };
 
+const getStaticKey = (
+	key: TSESTree.Node,
+	computed: boolean,
+) => {
+	if (!computed && key.type === 'Identifier') {
+		return key.name;
+	}
+	if (key.type === 'Literal' && typeof key.value === 'string') {
+		return key.value;
+	}
+	if (key.type === 'TemplateLiteral' && key.expressions.length === 0) {
+		return key.quasis[0].value.cooked ?? undefined;
+	}
+};
+
 // `a.b`, `a['b']`, and `this.#b`, named the same way as `getKeyName`
 const getPropertyName = (
 	member: TSESTree.MemberExpression,
 ) => {
 	const { property } = member;
-	if (member.computed) {
-		return property.type === 'Literal' && typeof property.value === 'string' ? property.value : undefined;
-	}
-	if (property.type === 'PrivateIdentifier') {
+	if (!member.computed && property.type === 'PrivateIdentifier') {
 		return `#${property.name}`;
 	}
-	return property.type === 'Identifier' ? property.name : undefined;
+	return getStaticKey(property, member.computed);
+};
+
+const getDestructuredPattern = (node: TSESTree.Node) => {
+	const { parent } = node;
+	if (
+		parent?.type === 'VariableDeclarator'
+		&& parent.init === node
+		&& parent.id.type === 'ObjectPattern'
+	) {
+		return parent.id;
+	}
+	if (
+		parent?.type === 'AssignmentExpression'
+		&& parent.operator === '='
+		&& parent.right === node
+		&& parent.left.type === 'ObjectPattern'
+	) {
+		return parent.left;
+	}
 };
 
 const isFunctionPropertyReference = (
-	node: TSESTree.Identifier | TSESTree.JSXIdentifier | TSESTree.FunctionExpression,
+	node: TSESTree.Node,
 ) => {
 	const { parent } = node;
-	if (parent.type !== 'MemberExpression' || parent.object !== node) {
+	const pattern = getDestructuredPattern(node);
+	if (pattern) {
+		return pattern.properties.some((property) => {
+			if (property.type !== 'Property') {
+				return false;
+			}
+			const name = getStaticKey(property.key, property.computed);
+			return name !== undefined && disallowedProperties.has(name);
+		});
+	}
+	if (parent?.type !== 'MemberExpression' || parent.object !== node) {
 		return false;
 	}
 
@@ -707,6 +748,21 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 			return currentScope === parentScope;
 		};
 
+		// Index references once per scope, so resolving many assignment targets stays linear
+		const scopeReferences = new WeakMap<
+			TSESLint.Scope.Scope,
+			Map<TSESLint.Scope.Reference['identifier'], TSESLint.Scope.Reference>
+		>();
+		const getAssignmentReference = (target: TSESTree.Identifier) => {
+			const scope = context.sourceCode.getScope!(target);
+			let indexed = scopeReferences.get(scope);
+			if (!indexed) {
+				indexed = new Map(scope.references.map(candidate => [candidate.identifier, candidate]));
+				scopeReferences.set(scope, indexed);
+			}
+			return indexed.get(target);
+		};
+
 		// Returns `undefined` when the expression references itself
 		const getExpressionReferences = (
 			node: TSESTree.FunctionExpression,
@@ -734,6 +790,16 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 
 				// The first reference is the variable declaration itself
 				references.push(...functionVariable.references.slice(1));
+			} else if (
+				node.parent.type === 'AssignmentExpression'
+				&& node.parent.operator === '='
+				&& node.parent.right === node
+				&& node.parent.left.type === 'Identifier'
+			) {
+				const write = getAssignmentReference(node.parent.left);
+				if (write?.resolved) {
+					references.push(...write.resolved.references.filter(reference => reference !== write));
+				}
 			}
 
 			return references;
@@ -748,29 +814,22 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 			|| parent.type === 'LogicalExpression'
 		);
 
-		// Index references once per scope, so resolving many assignment targets stays linear
-		const scopeReferences = new WeakMap<
-			TSESLint.Scope.Scope,
-			Map<TSESLint.Scope.Reference['identifier'], TSESLint.Scope.Reference>
-		>();
-
 		// Follows aliases: identifiers bound to the function directly or through a wrapper. Objects,
 		// arrays, destructuring, and calls are not followed (#10)
 		const someReference = (
 			references: TSESLint.Scope.Reference[],
-			predicate: (reference: TSESLint.Scope.Reference) => boolean,
+			predicate: (reference: TSESLint.Scope.Reference, expression: TSESTree.Node) => boolean,
 		) => {
 			const pending = [...references];
 			const visited = new Set<TSESLint.Scope.Variable>();
 			while (pending.length > 0) {
 				const reference = pending.pop()!;
-				if (predicate(reference)) {
-					return true;
-				}
-
 				let current: TSESTree.Node = reference.identifier;
 				while (isAliasWrapper(current, current.parent!)) {
 					current = current.parent!;
+				}
+				if (predicate(reference, current)) {
+					return true;
 				}
 				const parent = current.parent!;
 				let variable: TSESLint.Scope.Variable | undefined;
@@ -786,14 +845,7 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 					&& parent.right === current
 					&& parent.left.type === 'Identifier'
 				) {
-					const target = parent.left;
-					const scope = context.sourceCode.getScope!(target);
-					let indexed = scopeReferences.get(scope);
-					if (!indexed) {
-						indexed = new Map(scope.references.map(candidate => [candidate.identifier, candidate]));
-						scopeReferences.set(scope, indexed);
-					}
-					variable = indexed.get(target)?.resolved ?? undefined;
+					variable = getAssignmentReference(parent.left)?.resolved ?? undefined;
 				}
 				if (variable && !visited.has(variable)) {
 					visited.add(variable);
@@ -1049,8 +1101,8 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 					: getExpressionReferences(node, scope)
 			);
 
-			return references !== undefined && !someReference(references, ({ identifier }) => (
-				isConstructorReference(identifier) || isFunctionPropertyReference(identifier)
+			return references !== undefined && !someReference(references, (_reference, expression) => (
+				isConstructorReference(expression) || isFunctionPropertyReference(expression)
 			));
 		};
 

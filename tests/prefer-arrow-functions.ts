@@ -2097,6 +2097,7 @@ describe('prefer-arrow-functions', () => {
 					'function f(){} const { [`prototype`]: c } = f',
 					'function f(){} f[`prototype`]',
 					'function f(){} const g = (b = f) => new b()',
+					'function f(){} { var b = f } new b()',
 					'function a(){} function f(b = a){ return new b() } f.name',
 					'function f(){} const g = ({ b = f }) => new b()',
 					'function f(){} const g = (b = f) => { b = function(){}; new b() }',

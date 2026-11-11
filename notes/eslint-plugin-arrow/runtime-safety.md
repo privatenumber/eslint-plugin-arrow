@@ -119,7 +119,8 @@ Issues [#2](https://github.com/privatenumber/eslint-plugin-arrow/issues/2) and [
 **Decision**, shipping with the PRs that close #2 and #8: the list becomes `prototype`, `name`, `toString`, `caller`, and `arguments`.
 
 - Add `caller` and `arguments`. A sloppy `function` returns `null` or a value, and every other form throws `TypeError`. The rule skips them in strict code too: a read of `f.caller` is rare, so the skip costs almost nothing, and the rule does not need a second strictness check.
-- Remove `length`. It was `2` for every form of `f(a, b) {}`, so reading it never changes behavior. This is the only change in the list that converts more code.
+- Remove `length`. The built-in value was `2` for every form of `f(a, b) {}`, so reading it does not change behavior. Code can redefine `length` with a getter that inspects the function, but that is not worth a skip for every `length` read. This is the only change in the list that converts more code.
+- Removing `length` also removes accidental protection. In 1.0.0, a `length` read kept functions that other checks miss: the type cases in [type-safety.md](./type-safety.md), a direct `eval` ([#11](https://github.com/privatenumber/eslint-plugin-arrow/issues/11)), and construction through `Reflect.construct` ([#10](https://github.com/privatenumber/eslint-plugin-arrow/issues/10)). An independent review of #8 found each. So #8 merges after the fixes for #3, #4, #5, #6, #9, and #11. #10 stays a documented limit.
 - Keep `name`. Every form keeps the name by default, but `namedFunctionExpressions: true` is documented to change it, and the check protects that opt-in.
 
 ## Constructor use through an alias
@@ -145,6 +146,12 @@ An independent review of #2 found these forms. Each converts in 1.0.0, verified 
 Keeping a function whose `caller` is read does not keep its callers. In `function f() { return f.caller.arguments[0] }`, the read reaches the calling function's `arguments`, which throws if that caller was converted. The rule cannot know which functions call `f`, so the rule docs name this limit and point to `allowedNames`.
 
 Not followed, and documented as limits: objects and arrays (`{ A }`, `[A]`), destructuring, function arguments (`vi.fn(A)`, `Reflect.construct(A, [])`), and returns. Each would need to follow values through data structures or calls, which needs data flow analysis. The call argument case has its own issue, because Biome #9585 shows it in real test code.
+
+## Direct `eval`
+
+Issue [#11](https://github.com/privatenumber/eslint-plugin-arrow/issues/11). The rule finds uses of `this`, `arguments`, `new.target`, and `super` through scope analysis, which cannot see inside a string. `function f(a) { return eval('arguments[0]') }` converted, and the arrow function threw `ReferenceError` in a module. In CommonJS it read the module wrapper's `arguments` instead, so `f(42)` returned the `exports` object.
+
+**Decision**, shipping with the PR that closes #11: skip a function when its scope's unresolved references include a call to `eval`. Only a direct call can see the function's bindings, so `(0, eval)(code)`, `globalThis.eval(code)`, and `eval?.(code)` do not count. A call inside a nested function also counts. That is exact for a nested arrow function and conservative for a nested `function`, which the rule accepts because direct `eval` is rare.
 
 ## Checked and unchanged
 

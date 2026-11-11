@@ -13,7 +13,7 @@ export const cannotCompleteNormally = (
 			return true;
 		}
 		case 'BlockStatement': {
-			return cannotCompleteNormally(statement.body.at(-1));
+			return statement.body.some(cannotCompleteNormally);
 		}
 		case 'IfStatement': {
 			if (statement.test.type === 'Literal') {

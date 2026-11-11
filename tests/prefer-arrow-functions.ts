@@ -1844,6 +1844,14 @@ describe('prefer-arrow-functions', () => {
 					code: 'function f() { if (x) throw 1; else throw 2 }',
 				},
 				{
+					name: 'non-completing / trailing statement in branch',
+					code: 'function f() { if (x) { throw 1; ; } else { throw 2 } }',
+				},
+				{
+					name: 'non-completing / trailing statement in body',
+					code: 'function f() { throw 1; foo() }',
+				},
+				{
 					name: 'non-completing / true literal',
 					code: 'function f() { if (true) throw 1 }',
 				},
@@ -1910,8 +1918,8 @@ describe('prefer-arrow-functions', () => {
 				},
 				{
 					name: 'non-completing / unreachable return',
-					code: 'function f() { return; throw 1 }',
-					output: 'const f = () => { return; throw 1 }',
+					code: 'function f() { if (false) return; throw 1 }',
+					output: 'const f = () => { if (false) return; throw 1 }',
 					errors,
 				},
 				{

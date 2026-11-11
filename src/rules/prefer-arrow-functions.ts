@@ -909,11 +909,12 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 				return false;
 			}
 
-			// A declaration or class method that cannot complete infers `void`, not `never`
+			// A non-completing declaration or class method without a return type annotation or own return
+			// infers `void` (`Promise<void>` if async), but an arrow infers `never` (`Promise<never>`)
 			if (
 				(node.type === 'FunctionDeclaration' || parent.type === 'MethodDefinition')
 				&& !node.returnType
-				&& cannotCompleteNormally(node.body.body.at(-1))
+				&& cannotCompleteNormally(node.body)
 			) {
 				let hasReturn = false;
 				walk(context.sourceCode, [node.body], (child) => {

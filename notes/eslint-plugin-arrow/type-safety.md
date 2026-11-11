@@ -50,13 +50,13 @@ A JSDoc `@returns {never}` in JavaScript does not need a skip: the arrow functio
 
 - a function declaration. When it is exported, both the comment before `export` and the comment between `export default` and `function` count, because the default export fix moves the export after the new `const`, which turns the inner comment into a tag on the arrow function.
 - a variable statement whose first declarator has the function as its initializer. TypeScript attaches the statement's JSDoc to the first declarator only.
-- an assignment statement whose right side is the function, through any chain such as `a = b = function () {}`
+- an assignment statement whose right side is the function, through any chain such as `a = b = function () {}`, or through the right operand of `||` or `??`, as in `o.f = o.f || function () {}`. TypeScript follows one such operand ([`getSourceOfDefaultedAssignment`](https://github.com/microsoft/TypeScript/blob/v6.0.3/src/compiler/utilities.ts)); without it, the conversion drops the `this` type from the `.d.ts` output without a diagnostic.
 - a class field whose value is the function. TypeScript's result depends on where the comment is ([observed](../typescript/jsdoc-this.md#observed)); the skip ignores placement.
 - a class method, under `classMethods`
 
 Object properties, object methods, and call arguments convert. TypeScript still reads the tag there, but converting them did not report TS2730.
 
-The tag match is a plain `@this` word match, which also skips a comment that only mentions `@this` in backticks. TypeScript parses tags mid-line too, so a start-of-line match would miss real tags.
+The tag match is a plain `@this` word match, which also skips a comment that only mentions `@this` in backticks. TypeScript parses tags mid-line too, so a start-of-line match would miss real tags. The match errs toward skipping: a prose mention, a comment that TypeScript attaches to the previous statement on the same line, and a parenthesized function `(function () {})`, which TypeScript does not treat as the host, all skip a function that would convert safely. An escaped tag name such as `@\u0074his` is the one form the match misses; it is not used in practice.
 
 The skip applies to every file type, not only `.js` files with `checkJs`. A TypeScript file ignores the tag, so the skip only costs a conversion there, and the rule cannot see `checkJs`.
 

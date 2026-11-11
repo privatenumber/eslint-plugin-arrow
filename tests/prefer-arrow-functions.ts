@@ -142,14 +142,6 @@ describe('prefer-arrow-functions', () => {
 				name: 'function name / expression / inside',
 				code: '(function a(){ return a.name })',
 			},
-			{
-				name: 'function length',
-				code: 'function a(){}a.length',
-			},
-			{
-				name: 'function length / expression',
-				code: 'const a = function(){};a.length',
-			},
 
 			// Read directly on the expression. Found in mochajs/mocha and acornjs/acorn
 			{
@@ -1129,6 +1121,10 @@ describe('prefer-arrow-functions', () => {
 		const cases = {
 			valid: [
 				{
+					name: 'name property / declaration',
+					code: 'function a(){}a.name',
+				},
+				{
 					name: 'caller property / declaration',
 					code: 'function a(){} a.caller',
 				},
@@ -1162,6 +1158,21 @@ describe('prefer-arrow-functions', () => {
 				},
 			],
 			invalid: [{
+				name: 'length property / declaration',
+				code: 'function a(){}a.length',
+				errors: [{ messageId: 'preferArrowFunction' as const }],
+				output: 'const a = () => {};a.length',
+			}, {
+				name: 'length property / expression binding',
+				code: 'const a = function(){};a.length',
+				errors: [{ messageId: 'preferArrowFunction' as const }],
+				output: 'const a = () => {};a.length',
+			}, {
+				name: 'length property / direct expression',
+				code: '(function(){}).length',
+				errors: [{ messageId: 'preferArrowFunction' as const }],
+				output: '(() => {}).length',
+			}, {
 				name: 'call property / declaration remains convertible',
 				code: 'function a(){} a.call',
 				errors: [{ messageId: 'preferArrowFunction' as const }],

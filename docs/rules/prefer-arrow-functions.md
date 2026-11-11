@@ -226,13 +226,12 @@ class myClass extends Base {
     arrow = () => {}
 }
 
-// ✅ Functions whose name, length, or prototype is read
+// ✅ Functions whose name or prototype is read
 function myFunction() {
     return myFunction.name
 }
 myFunction.myFunctype = {}
 myFunction.name
-myFunction.length
 
 // ✅ Constructors
 function Constructor() {}
@@ -273,7 +272,6 @@ This rule will not generate warnings or fixes for traditional functions that use
 
 ### Function properties
 - [`name`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/name)
-- [`length`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/length)
 - [`prototype`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/prototype)
 - [`caller`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/caller), which differs only for sloppy-mode functions. Keeping the function does not keep its callers: `f.caller.arguments` throws if the calling function was converted, so list callers whose properties are read in [`allowedNames`](#allowednames).
 - [`arguments`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/arguments), which differs only for sloppy-mode functions
@@ -310,7 +308,7 @@ These count when read through the function's variable, such as `fn.name`, or dir
 > [!WARNING]
 > The rule only checks the current file. A conversion can still break your project in the cases below, so check for them before you enable the rule.
 
-- **Uses in other files.** Another file can read a converted function's `.length`, `.name`, `.prototype`, `.caller`, or `.arguments`, or call it with `new`. List those functions in [`allowedNames`](#allowednames).
+- **Uses in other files.** Another file can read a converted function's `.name`, `.prototype`, `.caller`, or `.arguments`, or call it with `new`. List those functions in [`allowedNames`](#allowednames).
 - **Import cycles.** In an import cycle, another module can call an exported function before its own module finishes running. A function declaration already works at that point, but a `const` arrow function does not exist yet, so the call throws. This also applies to any converted helper that the exported function calls. Bundling does not prevent it. Disable the rule for modules that other modules in a cycle call while they load.
 - **Indirect uses.** The rule checks direct uses of a function's name. It doesn't follow a function through another variable, so `const g = f; new g()` throws after `f` is converted. List those functions in [`allowedNames`](#allowednames).
 - **Code that reads a function's source.** Converting a function changes its source text, which `fn.toString()` returns. Code that reads a function's source breaks, for example to run it in another context, or to read its parameter names for dependency injection, as `async.autoInject()` does.

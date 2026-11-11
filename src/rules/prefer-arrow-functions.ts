@@ -971,13 +971,22 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 			};
 			while (pending.length > 0) {
 				for (const reference of pending.pop()!.references) {
-					const targetParent = reference.identifier.parent;
+					let target: TSESTree.Node = reference.identifier;
+					while (
+						target.parent
+						&& isAliasWrapper(target, target.parent)
+						&& 'expression' in target.parent
+						&& target.parent.expression === target
+					) {
+						target = target.parent;
+					}
+					const targetParent = target.parent!;
 					const starts: TSESTree.Node[] = [reference.identifier];
 					// Connect reassigned targets to outer bindings in `c = b = a = function(){}`
 					if (
 						targetParent.type === 'AssignmentExpression'
 						&& targetParent.operator === '='
-						&& targetParent.left === reference.identifier
+						&& targetParent.left === target
 					) {
 						starts.push(targetParent);
 					}
@@ -1006,7 +1015,7 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 							|| (
 								targetParent.type === 'AssignmentExpression'
 								&& targetParent.operator === '='
-								&& targetParent.left === reference.identifier
+								&& targetParent.left === target
 							)
 						)
 					) {

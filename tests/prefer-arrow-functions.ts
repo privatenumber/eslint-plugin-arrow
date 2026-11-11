@@ -1387,6 +1387,10 @@ describe('prefer-arrow-functions', () => {
 					code: '/** @this {A} */ a = b = c = function () {}',
 				},
 				{
+					name: 'JSDoc this / compound assignment',
+					code: '/** @this {A} */ a += function () {}',
+				},
+				{
 					name: 'JSDoc this / defaulted assignment',
 					code: '/** @this {A} */ o.f = o.f || function () {}',
 				},
@@ -1417,6 +1421,18 @@ describe('prefer-arrow-functions', () => {
 				},
 			],
 			invalid: [
+				{
+					name: 'JSDoc this / bare logical expression',
+					code: '/** @this {A} */ o.f || function () {}',
+					output: '/** @this {A} */ o.f || (() => {})',
+					errors,
+				},
+				{
+					name: 'JSDoc this / logical around assignment',
+					code: '/** @this {A} */ a = b || (c = function () {})',
+					output: '/** @this {A} */ a = b || (c = () => {})',
+					errors,
+				},
 				{
 					name: 'JSDoc this / ordinary comment',
 					code: '/* @this {A} */ function f() {}',

@@ -429,9 +429,27 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 			}
 		};
 
-		// TypeScript reads `@this` from the last JSDoc comment on these hosts only
-		const hasThisTag = (node: FunctionNode) => {
+		const getThisTagHost = (node: FunctionNode): TSESTree.Node | undefined => {
 			const { parent } = node;
+			if (node.type === 'FunctionDeclaration') {
+				return node;
+			}
+			if (parent.type === 'MethodDefinition') {
+				return parent;
+			}
+			if (parent.type === 'PropertyDefinition' && parent.value === node) {
+				return parent;
+			}
+			if (parent.type === 'VariableDeclarator') {
+				if (
+					parent.init === node
+					&& parent.parent.type === 'VariableDeclaration'
+					&& parent.parent.declarations[0] === parent
+				) {
+					return parent.parent;
+				}
+				return;
+			}
 
 			// TypeScript follows a defaulted assignment such as `o.f = o.f || function () {}`
 			let value: TSESTree.Node = node;
@@ -442,48 +460,35 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 			) {
 				value = value.parent;
 			}
-			let host: TSESTree.Node | undefined;
-			if (node.type === 'FunctionDeclaration') {
-				host = node;
-			} else if (parent.type === 'MethodDefinition') {
-				host = parent;
-			} else if (parent.type === 'PropertyDefinition' && parent.value === node) {
-				host = parent;
-			} else if (
-				parent.type === 'VariableDeclarator'
-				&& parent.init === node
-				&& parent.parent.type === 'VariableDeclaration'
-				&& parent.parent.declarations[0] === parent
+			while (
+				value.parent?.type === 'AssignmentExpression'
+				&& value.parent.right === value
 			) {
-				host = parent.parent;
-			} else if (value.parent?.type === 'AssignmentExpression' && value.parent.right === value) {
-				let assignment = value.parent;
-				while (
-					assignment.parent.type === 'AssignmentExpression'
-					&& assignment.parent.right === assignment
-				) {
-					assignment = assignment.parent;
-				}
-				if (assignment.parent.type === 'ExpressionStatement') {
-					host = assignment.parent;
-				}
+				value = value.parent;
 			}
-			if (!host) {
-				return false;
+			if (value.type === 'AssignmentExpression' && value.parent?.type === 'ExpressionStatement') {
+				return value.parent;
 			}
-			const hosts = [host];
-			if (
-				host.parent?.type === 'ExportNamedDeclaration'
-				|| host.parent?.type === 'ExportDefaultDeclaration'
-			) {
-				hosts.push(host.parent);
-			}
-			return hosts.some((commentHost) => {
-				const comment = context.sourceCode.getCommentsBefore(commentHost).findLast(
-					entry => entry.type === 'Block' && entry.value.startsWith('*'),
-				);
-				return comment !== undefined && /@this\b/u.test(comment.value);
-			});
+		};
+
+		const hasThisTagInComment = (commentHost: TSESTree.Node) => {
+			const comment = context.sourceCode.getCommentsBefore(commentHost).findLast(
+				entry => entry.type === 'Block' && entry.value.startsWith('*'),
+			);
+			return comment !== undefined && /@this\b/u.test(comment.value);
+		};
+
+		// TypeScript reads `@this` from the last JSDoc comment on these hosts only
+		const hasThisTag = (node: FunctionNode) => {
+			const host = getThisTagHost(node);
+			return host !== undefined && (
+				hasThisTagInComment(host)
+				|| (
+					(host.parent?.type === 'ExportNamedDeclaration'
+						|| host.parent?.type === 'ExportDefaultDeclaration')
+					&& hasThisTagInComment(host.parent)
+				)
+			);
 		};
 
 		const resolveTypeAlias = (reference: TSESTree.TSTypeReference) => {

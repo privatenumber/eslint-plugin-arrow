@@ -431,7 +431,7 @@ const store = {
 **Why enable it:**
 
 - Objects use the same arrow function syntax as the rest of the code. An arrow function also shows that the method does not use `this`.
-- The conversion does not change behavior. The rule never converts methods that use `this`, `super`, or `arguments`, and the converted property has the same name and enumerability.
+- Calls to the method work the same way. The rule never converts methods that use `this`, `super`, or `arguments`, and the converted property has the same name and enumerability. The method's source text does change, so code that reads it with `toString()` can break (see [Code the rule cannot check](#code-the-rule-cannot-check)).
 
 **Why disable it:**
 

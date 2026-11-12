@@ -30,6 +30,8 @@ A type-aware mode could read the resolved return type through `parserServices` a
 
 **Revisit when** Oxlint gives JS plugins type information, or when a report shows a case that only types can catch, such as an imported `never` alias.
 
+[fix-policy.md](./fix-policy.md#type-information) checked this decision again for callees that construct their argument (#10), and kept it.
+
 ## #4: signatures that read the function's own type
 
 **Decision:** generalize `hasCircularTypeQuery`. Skip when the function's parameters, return type, or type parameters contain `typeof <ownName>`, including qualified names such as `typeof f.length`. Also skip when they reference a type alias declared in the same file whose definition contains `typeof <ownName>`, following aliases transitively.

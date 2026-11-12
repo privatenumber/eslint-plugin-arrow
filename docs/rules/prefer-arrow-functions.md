@@ -431,7 +431,7 @@ const store = {
 **Why enable it:**
 
 - Objects use the same arrow function syntax as the rest of the code. An arrow function also shows that the method does not use `this`.
-- Calls to the method work the same way. The rule never converts methods that use `this`, `super`, or `arguments`, and the converted property has the same name and enumerability.
+- Calls to the method work the same way, unless code reads the method's source. The rule never converts methods that use `this`, `super`, or `arguments`, and the converted property has the same name and enumerability.
 
 **Why disable it:**
 

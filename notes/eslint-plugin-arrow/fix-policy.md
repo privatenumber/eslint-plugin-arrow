@@ -54,10 +54,10 @@ No failure came from the 3,316 call arguments, 134 exports, 379 stored values, o
 
 ### Constructor names
 
-A capitalized name is the common convention for a constructor. ESLint core's [`new-cap`](https://eslint.org/docs/latest/rules/new-cap) enforces it by checking that the first character of a constructor's name is uppercase, which accepts `URL` and `XMLHttpRequest`. The corpus counts below used a narrower test, an uppercase letter followed by a lowercase letter or digit, so they exclude all-caps names. This note says PascalCase for that narrower test, and constructor name for `new-cap`'s test. The corpus shows that the convention predicts construction in other files:
+A capitalized name is the common convention for a constructor. ESLint core's [`new-cap`](https://eslint.org/docs/latest/rules/new-cap) enforces it by rejecting `new` on a name that starts with a lowercase letter. This note says constructor name for a name whose first character is an uppercase letter, which includes `URL` and `XMLHttpRequest`. Names that start with `_` or `$` pass `new-cap` but are not constructor names here, because nothing marks them as constructors. The corpus counts below used a narrower test, PascalCase: an uppercase letter followed by a lowercase letter or digit, which excludes all-caps names. The corpus shows that the convention predicts construction in other files:
 
 - 1,197 of 28,054 reports (4.3%) have a PascalCase name: 1,175 on the function itself, and 22 on the binding that receives the result of the call the function is passed to, such as `{ GoogleAuthProvider: vi.fn(function () {}) }`.
-- Of 167 exported PascalCase functions, 58 (35%) matched a search for construction with `new`, `extends`, or `instanceof`, or have their `.prototype` read, in another file that names the module. For example, three.js `src/renderers/webgl/WebGLRenderStates.js` exports `function WebGLRenderStates(extensions)`, and `src/renderers/WebGLRenderer.js` runs `new WebGLRenderStates( extensions )`. The rule at `cb0105e` converts it, and the fix makes `new` throw `TypeError`.
+- Of 167 exported PascalCase functions, 58 (35%) matched a search for construction with `new`, `extends`, or `instanceof`, or have their `.prototype` read, in another file that names the module. The search was the regular expression `\bnew\s+(?:[\w$]+\.)?N\b|\bextends\s+(?:[\w$]+\.)?N\b|\binstanceof\s+(?:[\w$]+\.)?N\b|\bN\.prototype\b` for a name `N` of at least three characters, in files whose text contains the module's file name without its extension (or its directory name for `index` files). For example, three.js `src/renderers/webgl/WebGLRenderStates.js` exports `function WebGLRenderStates(extensions)`, and `src/renderers/WebGLRenderer.js` runs `new WebGLRenderStates( extensions )`. The rule at `cb0105e` converts it, and the fix makes `new` throw `TypeError`.
 - Of 2,938 exported functions with other names, 37 (1.3%) matched the same search, and some matches are false, such as Mastodon's `history` reducer matching the word "history" in a comment.
 
 The search is a regular expression over source text, so the counts are estimates. They are large enough to separate the two groups.
@@ -109,7 +109,7 @@ The rule docs claimed that converting an object method "does not change behavior
 - The contextual type of the function in `vi.fn(function () {})` is `(() => { a: number }) | undefined`, with call signatures only. Inference erases the construct possibility.
 - The declared parameter of the selected overload is `T | undefined` with `T extends Procedure | Constructable`. Resolving the constraint shows a construct signature. So the declared parameter type, not the contextual type, can detect a callee that may construct.
 - A call-only type proves nothing: JavaScript callers, casts, and `any` can still construct the function. Types can add caution, but cannot prove a fix safe.
-- Callees declared in `typescript/lib/lib.*.d.ts` have spec-defined behavior. Most, such as `Array.prototype.map` and `addEventListener`, only call their callback, but some construct it, such as `Reflect.construct`. So the declaration file alone does not prove a callback safe, and a typed mode would still need the declared parameter type. This policy fixes callbacks to these callees anyway.
+- Callees declared in `typescript/lib/lib.*.d.ts` have spec-defined behavior. Most, such as `Array.prototype.map` and `addEventListener`, only call their callback, but some construct it, such as `Reflect.construct`. So the declaration file alone does not prove a callback safe, and a typed mode would still need the declared parameter type. This policy fixes callbacks to the other callees anyway, and keeps functions passed to `Reflect.construct` (see [Implementation](#implementation)).
 
 **Decision:** keep the rule syntax-only. The PascalCase signal covers the reported #10 case without types. Oxlint still gives JS plugins no type information, so a typed tier would make the same config behave differently in each linter.
 
@@ -126,7 +126,7 @@ This is one reason to keep suggestions rare: in ESLint, each suggestion is a rep
 
 ### Corpus revisions
 
-The probe and the fix-then-test harness were scratch scripts and were not kept, as in [field-test.md](./field-test.md). A new run will not reproduce the counts exactly, because the labels depend on the probe's choices. To compare with these results, check out these revisions, run the rule with default options on the files described in [Corpus](#corpus), label each report with every use of its value that the probe follows, and count it in the first category of the priority order in [Corpus](#corpus). Each file was parsed with `@typescript-eslint/parser`, as `module` when it is `.mjs`, `.ts`, `.mts`, or `.tsx` or starts with `import` or `export`, and as `commonjs` otherwise.
+The probe and the fix-then-test harness were scratch scripts and were not kept, as in [field-test.md](./field-test.md). A new run will not reproduce the counts exactly, because the labels depend on the probe's choices. To compare with these results, check out these revisions, run the rule with default options on the files described in [Corpus](#corpus), label each report with every use of its value that the probe follows, and count it in the first category of the priority order in [Corpus](#corpus). The probe follows a value through variable references, assignments to variables, and the same wrappers the rule follows (parentheses, TypeScript assertions, conditional and logical operands, and the last comma operand). It labels the use at the end: a call argument, an object or array element, a member assignment, an export, a return, or a direct call. Each file was parsed with `@typescript-eslint/parser`, as `module` when it is `.mjs`, `.ts`, `.mts`, or `.tsx` or starts with `import` or `export`, and as `commonjs` otherwise.
 
 | Repository | Revision |
 | --- | --- |
@@ -146,6 +146,8 @@ The probe and the fix-then-test harness were scratch scripts and were not kept, 
 | vitejs/vite | `bd32fea2cb17` |
 | vitest-dev/vitest | `f4fdbcae08ec` |
 | webpack/webpack | `00c67af54e09` |
+
+The fix-then-test runs installed dependencies with `npm ci --ignore-scripts` (`npm install --ignore-scripts` for Express, which has no lockfile), then ran `npm test` (Express), `npm run mocha-node-test` (Async), `npm run test:main` after the documented build (Lodash), and `npm run test:vitest:unit` (Axios).
 
 ## Rejected alternatives
 
@@ -172,16 +174,17 @@ Skipping would avoid a report that a user must resolve. Rejected because the sea
 `eslint-plugin-arrow@1.0.0` was published on 2026-11-04, so changes follow semver. This note applies [ESLint's semantic versioning policy](https://github.com/eslint/eslint#semantic-versioning-policy), which calls a change major when it is "likely to break your lint build".
 
 - **Suggestion instead of fix for constructor-named functions:** the rule reports the same functions, but `eslint --fix` no longer clears those reports. A lint build that ran `--fix` and passed can then fail, as when a bug fix reports more errors. ESLint's policy releases that case as a minor version, so this change is a `feat:`, a minor release. The old fix makes `new` throw `TypeError`, so keeping it is not an option.
-- **`objectMethods` default `false`:** the rule reports fewer functions by default, which cannot fail a lint build that passed. It changes a default rather than fixing a bug, so it is a `feat:`, a minor release. Users who want the old behavior set `objectMethods: true`.
+- **`objectMethods` default `false`:** the rule reports fewer functions by default. A build can still fail when it reports unused disable directives as errors (`reportUnusedDisableDirectives: 'error'`), because a disable comment above an object method no longer suppresses anything. ESLint's policy accepts this effect for changes that report fewer errors, which it releases as patches. This change alters a default rather than fixing a bug, so it is a `feat:`, a minor release. Users who want the old behavior set `objectMethods: true`.
 - **The docs corrections:** documentation only, with no release of their own.
 
-No change in this policy alters an option, a schema, or an export, so none is a major release.
+No change in this policy alters an option's schema or an export. One change alters an option's default, which reports fewer errors. So none is a major release.
 
 ## Implementation
 
 Two changes, each in its own PR:
 
 1. Add `meta.hasSuggestions` and the suggestion tier for functions with a constructor name that are used other than by direct calls, with tests for each signal and for the JSX exception. This resolves #10.
-2. Change the `objectMethods` default to `false`, and update the rule docs and the options note.
+2. Change the `objectMethods` default to `false`, and update the rule docs, the README, and the options note.
+3. Keep a function passed to `Reflect.construct` in the same file, directly or through an alias. The rule follows `new` but not this built-in, so the file shows the need and the current fix breaks it.
 
 The docs corrections for object methods, and the CONTRIBUTING wording of the correctness priority, ship with this note.

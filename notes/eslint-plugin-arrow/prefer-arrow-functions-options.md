@@ -82,7 +82,7 @@ Two cases were bugs in that earlier version. The rule converted `m` in `class F 
 
 **What it converts:** `{ load() {} }` becomes `{ load: () => {} }`.
 
-**Kind: style.** Methods that use `this`, `super`, or `arguments` are skipped for everyone. For the rest, we found no observable difference:
+**Kind: style, with a type-checking change.** Methods that use `this`, `super`, or `arguments` are skipped for everyone. For the rest, the runtime properties below match. The source text from `toString()` differs, and with `strictFunctionTypes` TypeScript checks the converted property's parameters contravariantly instead of bivariantly. [fix-policy.md](./fix-policy.md#object-methods) records why this makes the default `false`, a change that is planned and not shipped yet:
 
 ```text
 name, method: load | arrow: load

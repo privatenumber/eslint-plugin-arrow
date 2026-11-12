@@ -10,7 +10,7 @@ eslint-plugin-arrow provides two lint rules, [`prefer-arrow-functions`](./docs/r
 
 ## Priorities
 
-1. **Correctness:** when a conversion could change runtime behavior or TypeScript checking, skip it. A missed conversion is better than broken code.
+1. **Correctness:** when the file shows that a conversion changes runtime behavior or TypeScript checking, skip it. A missed conversion is better than broken code. For uses the rule cannot see, such as other files, fixes follow the model and tiers in [notes/eslint-plugin-arrow/fix-policy.md](./notes/eslint-plugin-arrow/fix-policy.md).
 2. **Precise fixes:** keep comments, line breaks, and types. Prefer inserting or removing tokens over regenerating code.
 3. **Portability:** a rule must work with ESLint's default parser, `@typescript-eslint/parser`, and Oxlint. TypeScript-only AST and scope properties are missing in JavaScript files.
 

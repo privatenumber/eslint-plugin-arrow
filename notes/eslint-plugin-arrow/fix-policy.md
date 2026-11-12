@@ -11,7 +11,8 @@ Status: decided 2026-11-12. The implementation is planned (see [Implementation](
 3. **Suggest when a convention signals a need that the rule cannot verify.** The rule reports the function and offers the conversion as a suggestion, without a fix. The only signal with evidence today is a constructor name (see [Constructor names](#constructor-names)).
 4. **Fix everything else.** This includes call arguments, exports, and values stored in objects and arrays. The tested breakage rate for these is zero (see [Measured breakage](#measured-breakage)).
 5. **Downgrade a tier only with evidence of risk, not because a risk is possible.** Every category outside the file has a possible risk. Downgrading all of them would remove most of the rule's fixes (see [Rejected: suggest for every value that leaves the file](#rejected-suggest-for-every-value-that-leaves-the-file)).
-6. **Types do not change the tier.** There is still no type-aware mode (see [Type information](#type-information)).
+6. **Default off an option whose syntax alone changes TypeScript checking.** `objectMethods` changes to default `false` (see [Object methods](#object-methods)).
+7. **Types do not change the tier.** There is still no type-aware mode (see [Type information](#type-information)).
 
 ## Evidence
 
@@ -75,13 +76,31 @@ The JSX exception is a convention, like the constructor name itself. React and s
 
 ### Object methods
 
-**Decision:** object methods keep their fix, and `objectMethods` keeps its default of `true`.
+**Decision:** change the `objectMethods` default to `false`. When a user enables the option, object methods keep their fix.
 
-The only breakage in the fix-then-test experiment came from object methods: 2 of 156 in Async. `async.autoInject` takes an object of task functions and reads each task's parameter names from their source, and its parser handles the converted arrow text differently. This is the `toString()` risk that the rule docs already list under "Code the rule cannot check". The risk is not specific to methods: any converted function's source changes. A principle that downgraded methods for it would have to downgrade every category. One parser in one test file is not enough evidence to do that (see [Rejected: default `objectMethods` to `false`](#rejected-default-objectmethods-to-false)).
+The deciding evidence is a TypeScript checking change. With `strictFunctionTypes`, TypeScript checks method parameters bivariantly and function-typed properties contravariantly ([../typescript/class-fields.md](../typescript/class-fields.md)). So an assignment that accepts an object whose method takes a narrower parameter type passes before the fix and fails with `TS2322` after it:
 
-Converting an object method also changes how TypeScript checks it. With `strictFunctionTypes`, TypeScript checks method parameters bivariantly and function-typed properties contravariantly ([../typescript/class-fields.md](../typescript/class-fields.md)), so an assignment that accepted a narrower parameter type can fail with `TS2322` after the fix. This fails at type-check time, not at runtime, and the same limit already applies to `classMethods`. It does not change the decision.
+<!-- eslint-skip -->
+```ts
+type A = { a: 1 }
+type D = A & { d: 1 }
+const wide = { handle(x: A) {} } // after the fix: { handle: (x: A) => {} }
+declare const narrow: { handle(x: D): void }
+export const ok: typeof wide = narrow // TS2322 after the fix
+```
 
-The rule docs claimed that converting an object method "does not change behavior". That claim was false, because `toString()` output and parameter type checking change. The docs now say what stays the same and what changes.
+[CONTRIBUTING.md](../../CONTRIBUTING.md) makes correctness the first priority and skips a conversion when the file shows it changes TypeScript checking. A method's syntax alone carries this change, so a default-on conversion contradicts that priority. The options note had called `objectMethods` a style option with "no observable difference" ([prefer-arrow-functions-options.md](./prefer-arrow-functions-options.md#objectmethods)), which this finding corrects.
+
+Other evidence points the same way:
+
+- The only breakage in the fix-then-test experiment came from object methods: 2 of 156 in Async. `async.autoInject` reads each task's parameter names from its source, and its parser handles the converted arrow text differently. This `toString()` risk applies to every converted function, so it would not decide the default alone.
+- ESLint core [`object-shorthand`](https://eslint.org/docs/latest/rules/object-shorthand) with `avoidExplicitReturnArrows` undoes the conversion.
+- ESLint `prefer-arrow-callback` and Biome `useArrowFunction` do not convert methods ([prior-art.md](./prior-art.md)).
+- The default then matches `classMethods: false`. `classMethods` already documents the same variance change.
+
+Skipping only the methods with type-annotated parameters was rejected: a method's parameters can also be typed by context, such as an object literal assigned to an annotated variable, and the rule cannot see those types.
+
+The rule docs claimed that converting an object method "does not change behavior". That claim was false, because `toString()` output and parameter type checking change. The docs now list both under "Why disable it".
 
 ### Type information
 
@@ -148,23 +167,21 @@ Rejected for the same reason: each user would have to find every constructing ca
 
 Skipping would avoid a report that a user must resolve. Rejected because the search in [Constructor names](#constructor-names) found no construction in other files for 65% of exported PascalCase functions. The search can miss renamed imports, re-exports, and consumers outside the repository, and it also has false matches, so 65% is an estimate. A skip would hide all of them from the rule, and a suggestion still lets an editor or `oxlint --fix-suggestions` convert them on purpose.
 
-### Rejected: default `objectMethods` to `false`
-
-The safety argument rests on the two Async failures, which come from one source parser and apply to every category, as [Object methods](#object-methods) explains. The style arguments, `object-shorthand`, Vue's Options API, and prior art that does not convert methods, were known when the default was chosen ([prefer-arrow-functions-options.md](./prefer-arrow-functions-options.md)), and there is no new evidence on them.
-
-**Revisit when** a report shows object methods breaking more often than other conversions, outside of code that reads function source.
-
 ## Versioning
 
 `eslint-plugin-arrow@1.0.0` was published on 2026-11-04, so changes follow semver. This note applies [ESLint's semantic versioning policy](https://github.com/eslint/eslint#semantic-versioning-policy), which calls a change major when it is "likely to break your lint build".
 
 - **Suggestion instead of fix for constructor-named functions:** the rule reports the same functions, but `eslint --fix` no longer clears those reports. A lint build that ran `--fix` and passed can then fail, as when a bug fix reports more errors. ESLint's policy releases that case as a minor version, so this change is a `feat:`, a minor release. The old fix makes `new` throw `TypeError`, so keeping it is not an option.
-- **The docs correction for object methods:** documentation only, with no release of its own.
+- **`objectMethods` default `false`:** the rule reports fewer functions by default, which cannot fail a lint build that passed. It changes a default rather than fixing a bug, so it is a `feat:`, a minor release. Users who want the old behavior set `objectMethods: true`.
+- **The docs corrections:** documentation only, with no release of their own.
 
 No change in this policy alters an option, a schema, or an export, so none is a major release.
 
 ## Implementation
 
-One change, in its own PR: add `meta.hasSuggestions` and the suggestion tier for functions with a constructor name that are used other than by direct calls, with tests for each signal and for the JSX exception. This resolves #10.
+Two changes, each in its own PR:
 
-The docs fix for the object method claim ships with this note.
+1. Add `meta.hasSuggestions` and the suggestion tier for functions with a constructor name that are used other than by direct calls, with tests for each signal and for the JSX exception. This resolves #10.
+2. Change the `objectMethods` default to `false`, and update the rule docs and the options note.
+
+The docs corrections for object methods, and the CONTRIBUTING wording of the correctness priority, ship with this note.

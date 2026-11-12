@@ -62,6 +62,19 @@ Inference: the move fix replaces a range that contains the callback, so the two 
 
 [tests/oxlint.ts](../../tests/oxlint.ts) runs this scenario against the build and locks the final output.
 
+## Suggestions
+
+Oxlint applies suggestions from JS plugins in bulk, which ESLint's CLI cannot do. Observed on 2026-11-11 with Oxlint 1.90.0 and a test plugin whose rule reports `fixme` with a fix, and `suggestme` with two suggestions (`first`, `second`):
+
+| Command | `fixme;` | `suggestme;` |
+| --- | --- | --- |
+| `oxlint --fix` | `fixed;` | unchanged |
+| `oxlint --fix-suggestions` | `fixed;` | `first;` |
+| `oxlint --fix --fix-suggestions` | `fixed;` | `first;` |
+| `oxlint --fix-dangerously` | `fixed;` | `first;` |
+
+`--fix-suggestions` also applies fixes, and applies only the first suggestion of each report. A JS plugin cannot mark an edit as dangerous: its `fix` maps to a fix and its `suggest` entries map to suggestions.
+
 ## Source type comes from the file, not the package
 
 Oxlint has no `sourceType` option. It decides from the file extension and syntax: a `.js` file without `import` or `export` is a classic script, even when `package.json` sets `"type": "commonjs"`. ESLint, by contrast, uses `commonjs` for such files when the config says so.

@@ -4,13 +4,13 @@
 
 eslint-plugin-arrow provides two lint rules, [`prefer-arrow-functions`](./docs/rules/prefer-arrow-functions.md) and [`no-function-hoisting`](./docs/rules/no-function-hoisting.md), for ESLint and Oxlint.
 
-- **Goal:** autofixes that never change behavior and that edit only the tokens that must change.
+- **Goal:** autofixes that do not change behavior under the model in [notes/eslint-plugin-arrow/fix-policy.md](./notes/eslint-plugin-arrow/fix-policy.md), and that edit only the tokens that must change.
 - **Non-goals:** formatting code beyond the edited tokens, and rewriting function bodies (for example `{ return x }` to `x`). Formatters and rules such as [`arrow-body-style`](https://eslint.org/docs/latest/rules/arrow-body-style) own those.
 - **Biome:** not supported yet. See [notes/biome/plugins.md](./notes/biome/plugins.md).
 
 ## Priorities
 
-1. **Correctness:** when a conversion could change runtime behavior or TypeScript checking, skip it. A missed conversion is better than broken code.
+1. **Correctness:** when the file shows that a conversion changes runtime behavior or TypeScript checking, skip it. A missed conversion is better than broken code. A conversion that the file shows to be unsafe but the rule still fixes is a bug, unless the user enabled an option whose docs list that change, such as `classMethods`. For uses the rule cannot see, such as other files, fixes follow the model and tiers in the fix policy.
 2. **Precise fixes:** keep comments, line breaks, and types. Prefer inserting or removing tokens over regenerating code.
 3. **Portability:** a rule must work with ESLint's default parser, `@typescript-eslint/parser`, and Oxlint. TypeScript-only AST and scope properties are missing in JavaScript files.
 

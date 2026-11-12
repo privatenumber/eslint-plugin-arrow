@@ -7,7 +7,7 @@ Status: decided 2026-11-12. The implementation is planned (see [Implementation](
 ## Principles
 
 1. **A fix preserves behavior under a stated model, not absolutely.** No conversion from `function` to an arrow function is fully equivalent: the source text from `Function.prototype.toString` always changes, and a `function` declaration or expression that is not async or a generator loses `[[Construct]]` and its `prototype` property. Non-generator object methods and async functions already have neither ([../ecmascript/](../ecmascript/README.md)). A declaration also becomes a `const`, which other modules in an import cycle can call before it is initialized ([../ecmascript/module-evaluation.md](../ecmascript/module-evaluation.md)). A single-file rule cannot prove that no other code observes these. So a fix assumes a model, which the rule docs list under "Code the rule cannot check": code outside the file calls the functions it receives after their module has run, and does not construct them, read their source, or read their `prototype`, `caller`, or `arguments`, unless the function's name says it is a constructor.
-2. **Skip when the file proves the function is needed.** Same-file evidence, such as `new`, `instanceof`, `extends`, `.prototype`, `this`, `arguments`, hoisting, or reassignment, keeps the function. This is the existing behavior ([runtime-safety.md](./runtime-safety.md)).
+2. **Skip when the file proves the function is needed.** Same-file evidence, such as `new`, `instanceof`, `extends`, `.prototype`, `this`, `arguments`, hoisting, or reassignment, keeps the function. The rule finds this evidence through the uses it follows: direct references and aliases, not values put in objects or arrays and read back (the rule docs list these under "Indirect uses"). This is the existing behavior ([runtime-safety.md](./runtime-safety.md)).
 3. **Suggest when a convention signals a need that the rule cannot verify.** The rule reports the function and offers the conversion as a suggestion, without a fix. The only signal with evidence today is a constructor name (see [Constructor names](#constructor-names)).
 4. **Fix everything else.** This includes call arguments, exports, and values stored in objects and arrays. The tested breakage rate for these is zero (see [Measured breakage](#measured-breakage)).
 5. **Downgrade a tier only with evidence of risk, not because a risk is possible.** Every category outside the file has a possible risk. Downgrading all of them would remove most of the rule's fixes (see [Rejected: suggest for every value that leaves the file](#rejected-suggest-for-every-value-that-leaves-the-file)).
@@ -53,7 +53,7 @@ No failure came from the 3,316 call arguments, 134 exports, 379 stored values, o
 
 ### Constructor names
 
-A capitalized name is the common convention for a constructor. ESLint core's [`new-cap`](https://eslint.org/docs/latest/rules/new-cap) enforces the same convention by checking that the first character of a constructor's name is uppercase. This note says PascalCase for a name that starts with an uppercase letter followed by a lowercase letter or digit, which excludes constants such as `MAX`. The corpus shows that the convention predicts construction in other files:
+A capitalized name is the common convention for a constructor. ESLint core's [`new-cap`](https://eslint.org/docs/latest/rules/new-cap) enforces it by checking that the first character of a constructor's name is uppercase, which accepts `URL` and `XMLHttpRequest`. The corpus counts below used a narrower test, an uppercase letter followed by a lowercase letter or digit, so they exclude all-caps names. This note says PascalCase for that narrower test, and constructor name for `new-cap`'s test. The corpus shows that the convention predicts construction in other files:
 
 - 1,197 of 28,054 reports (4.3%) have a PascalCase name: 1,175 on the function itself, and 22 on the binding that receives the result of the call the function is passed to, such as `{ GoogleAuthProvider: vi.fn(function () {}) }`.
 - Of 167 exported PascalCase functions, 58 (35%) matched a search for construction with `new`, `extends`, or `instanceof`, or have their `.prototype` read, in another file that names the module. For example, three.js `src/renderers/webgl/WebGLRenderStates.js` exports `function WebGLRenderStates(extensions)`, and `src/renderers/WebGLRenderer.js` runs `new WebGLRenderStates( extensions )`. The rule at `cb0105e` converts it, and the fix makes `new` throw `TypeError`.
@@ -65,11 +65,13 @@ Issue [#10](https://github.com/privatenumber/eslint-plugin-arrow/issues/10) is t
 
 **Decision:** report with a suggestion and no fix when all of these are true:
 
-- The function's binding has a PascalCase name, or the function is passed to a call whose result is bound to a PascalCase name.
-- The value reaches a use that the existing constructor checks do not follow: an export, an object property, an array element, a member assignment, a call argument, or a return. A PascalCase function used only through variables and aliases keeps its fix, because those checks already see each `new`. For example, `const types = [Widget]; new types[0]()` and a factory that returns `Widget` get the suggestion.
+- The function has a constructor name, or it is passed to a call whose result is bound to a constructor name, as in `const URL = mock(function () {})`.
+- The function is used in a way other than a direct call. A function with a constructor name whose only uses are calls such as `Widget()` keeps its fix. Every other use, such as an export, `[Widget]`, `{ Widget }`, `Widget.bind(null)`, or `return Widget`, can lead to a `new` that the rule does not follow.
 - The function body does not return JSX. React and similar libraries call function components and never construct them, so a component is not a constructor.
 
-The JSX exception has no corpus measurement, because the corpus has little React code. It follows from how React calls function components. A report of a constructed function that returns JSX would justify removing it.
+The second condition is stated as the one safe use, not as a list of unsafe uses, because reviews of earlier drafts kept finding uses that a list missed: returns, arrays, and `bind`.
+
+The JSX exception is a convention, like the constructor name itself. React and similar libraries call function components and never construct them. Code can still construct a function that returns JSX, for example through a mock, but no case has been observed. The corpus has little React code, so the exception has no measurement. A report of a constructed function that returns JSX would justify removing it.
 
 ### Object methods
 
@@ -88,7 +90,7 @@ The rule docs claimed that converting an object method "does not change behavior
 - The contextual type of the function in `vi.fn(function () {})` is `(() => { a: number }) | undefined`, with call signatures only. Inference erases the construct possibility.
 - The declared parameter of the selected overload is `T | undefined` with `T extends Procedure | Constructable`. Resolving the constraint shows a construct signature. So the declared parameter type, not the contextual type, can detect a callee that may construct.
 - A call-only type proves nothing: JavaScript callers, casts, and `any` can still construct the function. Types can add caution, but cannot prove a fix safe.
-- Callees declared in `typescript/lib/lib.*.d.ts`, such as `Array.prototype.map` and `addEventListener`, have spec-defined behavior and never construct their callback. That would allow a typed mode to fix callbacks that a stricter policy suggests. This policy already fixes them.
+- Callees declared in `typescript/lib/lib.*.d.ts` have spec-defined behavior. Most, such as `Array.prototype.map` and `addEventListener`, only call their callback, but some construct it, such as `Reflect.construct`. So the declaration file alone does not prove a callback safe, and a typed mode would still need the declared parameter type. This policy fixes callbacks to these callees anyway.
 
 **Decision:** keep the rule syntax-only. The PascalCase signal covers the reported #10 case without types. Oxlint still gives JS plugins no type information, so a typed tier would make the same config behave differently in each linter.
 
@@ -98,14 +100,14 @@ The rule docs claimed that converting an object method "does not change behavior
 
 A suggestion is useful only if users can apply it. ESLint and Oxlint differ:
 
-- **ESLint 10.13.0:** the CLI applies fixes only. `--fix-type` filters by rule type (`problem`, `suggestion`, `layout`, `directive`), not by suggestion edits. Editors apply suggestions one at a time. [`eslint-interactive`](https://github.com/mizdra/eslint-interactive) can apply them in bulk.
+- **ESLint 10.13.0:** the CLI applies fixes only. `--fix-type` filters fixes by the rule's `meta.type` (`problem`, `suggestion`, `layout`) or by the `directive` category for unused disable directives. It never applies suggestion edits. Editors apply suggestions one at a time. [`eslint-interactive`](https://github.com/mizdra/eslint-interactive) can apply them in bulk.
 - **Oxlint 1.90.0:** `--fix` applies fixes only. `--fix-suggestions` applies fixes and the first suggestion of each report, including JS plugin suggestions ([../oxlint/js-plugins.md](../oxlint/js-plugins.md#suggestions)).
 
 This is one reason to keep suggestions rare: in ESLint, each suggestion is a report the user resolves by hand.
 
 ### Corpus revisions
 
-The probe and the fix-then-test harness were scratch scripts and were not kept, as in [field-test.md](./field-test.md). A new run will not reproduce the counts exactly, because the labels depend on the probe's choices. To compare with these results, check out these revisions, run the rule with default options on the files described in [Corpus](#corpus), and label each report by its first use that leaves the function's variable. Each file was parsed with `@typescript-eslint/parser`, as `module` when it is `.mjs`, `.ts`, `.mts`, or `.tsx` or starts with `import` or `export`, and as `commonjs` otherwise.
+The probe and the fix-then-test harness were scratch scripts and were not kept, as in [field-test.md](./field-test.md). A new run will not reproduce the counts exactly, because the labels depend on the probe's choices. To compare with these results, check out these revisions, run the rule with default options on the files described in [Corpus](#corpus), label each report with every use of its value that the probe follows, and count it in the first category of the priority order in [Corpus](#corpus). Each file was parsed with `@typescript-eslint/parser`, as `module` when it is `.mjs`, `.ts`, `.mts`, or `.tsx` or starts with `import` or `export`, and as `commonjs` otherwise.
 
 | Repository | Revision |
 | --- | --- |
@@ -144,7 +146,7 @@ Rejected for the same reason: each user would have to find every constructing ca
 
 ### Rejected: skip PascalCase functions
 
-Skipping would avoid a report that a user must resolve. Rejected because the search in [Constructor names](#constructor-names) found no construction in other files for 65% of exported PascalCase functions. The search can miss renamed imports, re-exports, and consumers outside the repository, so 65% is an upper bound on the functions that are not constructed. A skip would hide all of them from the rule, and a suggestion still lets an editor or `oxlint --fix-suggestions` convert them on purpose.
+Skipping would avoid a report that a user must resolve. Rejected because the search in [Constructor names](#constructor-names) found no construction in other files for 65% of exported PascalCase functions. The search can miss renamed imports, re-exports, and consumers outside the repository, and it also has false matches, so 65% is an estimate. A skip would hide all of them from the rule, and a suggestion still lets an editor or `oxlint --fix-suggestions` convert them on purpose.
 
 ### Rejected: default `objectMethods` to `false`
 
@@ -163,6 +165,6 @@ No change in this policy alters an option, a schema, or an export, so none is a 
 
 ## Implementation
 
-One change, in its own PR: add `meta.hasSuggestions` and the suggestion tier for constructor-named functions that leave the file, with tests for each signal and for the JSX exception. This resolves #10.
+One change, in its own PR: add `meta.hasSuggestions` and the suggestion tier for functions with a constructor name that are used other than by direct calls, with tests for each signal and for the JSX exception. This resolves #10.
 
 The docs fix for the object method claim ships with this note.

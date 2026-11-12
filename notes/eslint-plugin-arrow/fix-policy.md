@@ -6,7 +6,7 @@ Status: decided 2026-11-12. The implementation is planned (see [Implementation](
 
 ## Principles
 
-1. **A fix preserves behavior under a stated model, not absolutely.** No conversion from `function` to an arrow function is fully equivalent: the source text from `Function.prototype.toString` always changes, and the function loses `[[Construct]]` and `prototype` ([../ecmascript/](../ecmascript/README.md)). A single-file rule cannot prove that no other code observes these. So the docs state the model that a fix assumes: code outside the file calls the functions it receives, and does not construct them, read their source, or read their `prototype`, `caller`, or `arguments`, unless the function's name says it is a constructor.
+1. **A fix preserves behavior under a stated model, not absolutely.** No conversion from `function` to an arrow function is fully equivalent: the source text from `Function.prototype.toString` always changes, and a `function` declaration or expression that is not async or a generator loses `[[Construct]]` and its `prototype` property. Object methods and async functions already have neither ([../ecmascript/](../ecmascript/README.md)). A single-file rule cannot prove that no other code observes these. So the docs state the model that a fix assumes: code outside the file calls the functions it receives, and does not construct them, read their source, or read their `prototype`, `caller`, or `arguments`, unless the function's name says it is a constructor.
 2. **Skip when the file proves the function is needed.** Same-file evidence, such as `new`, `instanceof`, `extends`, `.prototype`, `this`, `arguments`, hoisting, or reassignment, keeps the function. This is the existing behavior ([runtime-safety.md](./runtime-safety.md)).
 3. **Suggest when a convention signals a need that the rule cannot verify.** The rule reports the function and offers the conversion as a suggestion, without a fix. The only signal with evidence today is a constructor name (see [Constructor names](#constructor-names)).
 4. **Fix everything else.** This includes call arguments, exports, and values stored in objects and arrays. The tested breakage rate for these is zero (see [Measured breakage](#measured-breakage)).
@@ -17,7 +17,7 @@ Status: decided 2026-11-12. The implementation is planned (see [Implementation](
 
 ### Corpus
 
-Method: 16 popular repositories, shallow-cloned on 2026-11-11 and only parsed: express, lodash, axios, webpack, three.js, jquery, async, date-fns, excalidraw, vite, vitest, jest, prettier, eslint, mastodon, undici. The rule at `cb0105e` ran with default options in ESLint 10.13.0 with `@typescript-eslint/parser`. A probe rule labeled each reported function by where its value goes, following variable references in the same file. Directories such as `node_modules`, `dist`, `vendor`, `fixtures`, and files over 512 KiB were excluded.
+Method: 16 popular repositories, shallow-cloned from their default branches on 2026-11-11 and only parsed (revisions in [Corpus revisions](#corpus-revisions)). The rule at `cb0105e` ran with default options in ESLint 10.13.0 with `@typescript-eslint/parser`. A probe rule labeled each reported function by where its value goes, following variable references in the same file. Directories such as `node_modules`, `dist`, `vendor`, `fixtures`, and files over 512 KiB were excluded.
 
 The rule reported 30,818 functions. The primary label of each, with the first matching label in this order: method, export, call argument, stored, returned, local:
 
@@ -45,7 +45,7 @@ Method: apply the fix to every file of a repository, source and tests, then run 
 | Lodash | 362 | 7,158 passed | 7,158 passed |
 | Axios | 589 | 1,781 passed | 1,781 passed |
 
-Both failures are object methods in `async/test/autoInject.js` (lines 93 and 116 at the cloned commit). `autoInject` parses `fn.toString()` to read parameter names, and its parser handles `a() {}` and `task5(task4 = 4, cb) {}` differently from the converted `a: () => {}` and `task5: (task4 = 4, cb) => {}`.
+Both failures are object methods in `async/test/autoInject.js` (lines 93 and 116 at the cloned commit). `autoInject` parses `fn.toString()` to read parameter names. Before the fix, `toString()` returns the method source, such as `a() {}` and `task5(task4 = 4, cb) {…}`. After it, `toString()` returns the arrow source, `() => {}` and `(task4 = 4, cb) => {…}`, without the property key. The parser handles the two forms differently.
 
 No failure came from the 3,316 call arguments, 134 exports, 379 stored values, or 498 local functions in these runs. This is a measure of test coverage, not a proof of safety. Undici and ESLint were not tested.
 
@@ -54,7 +54,7 @@ No failure came from the 3,316 call arguments, 134 exports, 379 stored values, o
 A PascalCase name is the community convention for a constructor. ESLint core enforces it with [`new-cap`](https://eslint.org/docs/latest/rules/new-cap). The corpus shows that the convention predicts construction in other files:
 
 - In this run, 1,197 of 28,054 reports (4.3%) have a PascalCase name: 1,175 on the function itself, and 22 on the binding that receives the result of the call the function is passed to, such as `{ GoogleAuthProvider: vi.fn(function () {}) }`.
-- Of 167 exported PascalCase functions, 58 (35%) are constructed with `new`, `extends`, or `instanceof`, or have their `.prototype` read, in another file that names the module. For example, three.js `src/renderers/webgl/WebGLRenderStates.js` exports `function WebGLRenderStates(extensions)`, and `src/renderers/WebGLRenderer.js` runs `new WebGLRenderStates( extensions )`. The rule at `cb0105e` converts it, and the fix makes `new` throw `TypeError`.
+- Of 167 exported PascalCase functions, 58 (35%) matched a search for construction with `new`, `extends`, or `instanceof`, or have their `.prototype` read, in another file that names the module. For example, three.js `src/renderers/webgl/WebGLRenderStates.js` exports `function WebGLRenderStates(extensions)`, and `src/renderers/WebGLRenderer.js` runs `new WebGLRenderStates( extensions )`. The rule at `cb0105e` converts it, and the fix makes `new` throw `TypeError`.
 - Of 2,938 exported functions with other names, 37 (1.3%) matched the same search, and some matches are false, such as Mastodon's `history` reducer matching the word "history" in a comment.
 
 The search is a regular expression over source text, so the counts are estimates. They are large enough to separate the two groups.
@@ -99,6 +99,29 @@ A suggestion is useful only if users can apply it. ESLint and Oxlint differ:
 
 This is one reason to keep suggestions rare: in ESLint, each suggestion is a report the user resolves by hand.
 
+### Corpus revisions
+
+The probe and the fix-then-test harness were scratch scripts and were not kept, as in [field-test.md](./field-test.md). To repeat the study, check out these revisions, run the rule with default options on the files described in [Corpus](#corpus), and label each report by where its value goes.
+
+| Repository | Revision |
+| --- | --- |
+| axios/axios | `4ee8d46fc463` |
+| caolan/async | `3921e54bd070` |
+| date-fns/date-fns | `a9739fb3e538` |
+| eslint/eslint | `480afad6e7ef` |
+| excalidraw/excalidraw | `701b901a0f1b` |
+| expressjs/express | `43fca52d28a4` |
+| jestjs/jest | `aa88f7cf0bfc` |
+| jquery/jquery | `feaa9fcdb68c` |
+| lodash/lodash | `2b5e6f7399a7` |
+| mastodon/mastodon | `b31c484d97c9` |
+| mrdoob/three.js | `6da7f45ef789` |
+| nodejs/undici | `09ed1694f809` |
+| prettier/prettier | `8cd4ec1248fd` |
+| vitejs/vite | `bd32fea2cb17` |
+| vitest-dev/vitest | `f4fdbcae08ec` |
+| webpack/webpack | `00c67af54e09` |
+
 ## Rejected alternatives
 
 ### Rejected: suggest for every value that leaves the file
@@ -117,7 +140,7 @@ Rejected for the same reason: each user would have to find every constructing ca
 
 ### Rejected: skip PascalCase functions
 
-Skipping would avoid a report that a user must resolve. Rejected because 65% of exported PascalCase functions are not constructed in other files, and a suggestion still lets an editor or `oxlint --fix-suggestions` convert them on purpose.
+Skipping would avoid a report that a user must resolve. Rejected because the search in [Constructor names](#constructor-names) found no construction in other files for 65% of exported PascalCase functions. The search can miss renamed imports, re-exports, and consumers outside the repository, so 65% is an upper bound on the functions that are not constructed. A skip would hide all of them from the rule, and a suggestion still lets an editor or `oxlint --fix-suggestions` convert them on purpose.
 
 ### Rejected: default `objectMethods` to `false`
 

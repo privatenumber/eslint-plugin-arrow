@@ -431,9 +431,12 @@ const store = {
 **Why enable it:**
 
 - Objects use the same arrow function syntax as the rest of the code. An arrow function also shows that the method does not use `this`.
-- Calls to the method work the same way. The rule never converts methods that use `this`, `super`, or `arguments`, and the converted property has the same name and enumerability. The method's source text does change, so code that reads it with `toString()` can break (see [Code the rule cannot check](#code-the-rule-cannot-check)).
+- Calls to the method work the same way. The rule never converts methods that use `this`, `super`, or `arguments`, and the converted property has the same name and enumerability.
 
 **Why disable it:**
+
+- The conversion changes the method's source text, so code that reads it with `toString()` can break (see [Code the rule cannot check](#code-the-rule-cannot-check)).
+- TypeScript checks method parameters bivariantly, but function-typed properties contravariantly with `strictFunctionTypes`. Assigning an object whose method takes a narrower parameter type can then fail to type-check.
 
 - Shorthand methods are shorter: `load() {}` compared to `load: () => {}`.
 - Your framework or style guide uses shorthand methods, such as Vue's Options API (`data() { return {} }`).

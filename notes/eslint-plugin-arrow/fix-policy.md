@@ -6,7 +6,7 @@ Status: decided 2026-11-12. The implementation is planned (see [Implementation](
 
 ## Principles
 
-1. **A fix preserves behavior under a stated model, not absolutely.** No conversion from `function` to an arrow function is fully equivalent: the source text from `Function.prototype.toString` always changes, and a `function` declaration or expression that is not async or a generator loses `[[Construct]]` and its `prototype` property. Object methods and async functions already have neither ([../ecmascript/](../ecmascript/README.md)). A single-file rule cannot prove that no other code observes these. So the docs state the model that a fix assumes: code outside the file calls the functions it receives, and does not construct them, read their source, or read their `prototype`, `caller`, or `arguments`, unless the function's name says it is a constructor.
+1. **A fix preserves behavior under a stated model, not absolutely.** No conversion from `function` to an arrow function is fully equivalent: the source text from `Function.prototype.toString` always changes, and a `function` declaration or expression that is not async or a generator loses `[[Construct]]` and its `prototype` property. Non-generator object methods and async functions already have neither ([../ecmascript/](../ecmascript/README.md)). A declaration also becomes a `const`, which other modules in an import cycle can call before it is initialized ([../ecmascript/module-evaluation.md](../ecmascript/module-evaluation.md)). A single-file rule cannot prove that no other code observes these. So a fix assumes a model, which the rule docs list under "Code the rule cannot check": code outside the file calls the functions it receives after their module has run, and does not construct them, read their source, or read their `prototype`, `caller`, or `arguments`, unless the function's name says it is a constructor.
 2. **Skip when the file proves the function is needed.** Same-file evidence, such as `new`, `instanceof`, `extends`, `.prototype`, `this`, `arguments`, hoisting, or reassignment, keeps the function. This is the existing behavior ([runtime-safety.md](./runtime-safety.md)).
 3. **Suggest when a convention signals a need that the rule cannot verify.** The rule reports the function and offers the conversion as a suggestion, without a fix. The only signal with evidence today is a constructor name (see [Constructor names](#constructor-names)).
 4. **Fix everything else.** This includes call arguments, exports, and values stored in objects and arrays. The tested breakage rate for these is zero (see [Measured breakage](#measured-breakage)).
@@ -19,18 +19,20 @@ Status: decided 2026-11-12. The implementation is planned (see [Implementation](
 
 Method: 16 popular repositories, shallow-cloned from their default branches on 2026-11-11 and only parsed (revisions in [Corpus revisions](#corpus-revisions)). The rule at `cb0105e` ran with default options in ESLint 10.13.0 with `@typescript-eslint/parser`. A probe rule labeled each reported function by where its value goes, following variable references in the same file. Directories such as `node_modules`, `dist`, `vendor`, `fixtures`, and files over 512 KiB were excluded.
 
-The rule reported 30,818 functions. The primary label of each, with the first matching label in this order: method, export, call argument, stored, returned, local:
+The rule reported 28,054 functions. The primary label of each, with the first matching label in this order: method, export, call argument, stored, returned, local:
 
 | Category | All | Source files | Test files |
 | --- | --- | --- | --- |
-| Call argument | 38.3% | 18.0% | 52.6% |
-| Local (every use visible) | 21.7% | 31.9% | 14.5% |
-| Object method | 16.3% | 14.2% | 17.8% |
-| Stored in an object, array, or member | 11.5% | 16.7% | 7.8% |
-| Exported (ESM or CommonJS) | 11.3% | 17.9% | 6.7% |
+| Call argument | 32.8% | 17.4% | 45.3% |
+| Local (every use visible) | 23.8% | 32.3% | 16.9% |
+| Object method | 18.0% | 14.4% | 20.8% |
+| Exported (ESM or CommonJS) | 12.3% | 17.9% | 7.8% |
+| Stored in an object, array, or member | 12.2% | 16.8% | 8.5% |
 | Returned | 0.8% | 1.2% | 0.5% |
 
-Callees of call arguments: test framework functions (`it`, `describe`, `test`) 44.9%, names of built-in callback APIs (`then`, `forEach`, `map`, `setTimeout`, `addEventListener`) 15.7%, other 39.3%. Mock factories such as `vi.fn` and `mockImplementation` received 2 functions in the whole corpus.
+Source files are 12,520 reports and test files are 15,534. Test files match `test/`, `tests/`, `__tests__/`, `spec/`, `e2e/`, or `.test.` and `.spec.` names.
+
+Callees of call arguments: test framework functions (`it`, `describe`, `test`) 41.1%, names of built-in callback APIs (`then`, `forEach`, `map`, `setTimeout`, `addEventListener`) 19.6%, other 39.4%. Mock factories such as `vi.fn` and `mockImplementation` received 2 functions in the whole corpus.
 
 Modern TypeScript repositories report few functions, because they already use arrow functions: date-fns 4, vitest 53, excalidraw 31. Most reports come from older JavaScript code.
 
@@ -51,9 +53,9 @@ No failure came from the 3,316 call arguments, 134 exports, 379 stored values, o
 
 ### Constructor names
 
-A PascalCase name is the community convention for a constructor. ESLint core enforces it with [`new-cap`](https://eslint.org/docs/latest/rules/new-cap). The corpus shows that the convention predicts construction in other files:
+A capitalized name is the common convention for a constructor. ESLint core's [`new-cap`](https://eslint.org/docs/latest/rules/new-cap) enforces the same convention by checking that the first character of a constructor's name is uppercase. This note says PascalCase for a name that starts with an uppercase letter followed by a lowercase letter or digit, which excludes constants such as `MAX`. The corpus shows that the convention predicts construction in other files:
 
-- In this run, 1,197 of 28,054 reports (4.3%) have a PascalCase name: 1,175 on the function itself, and 22 on the binding that receives the result of the call the function is passed to, such as `{ GoogleAuthProvider: vi.fn(function () {}) }`.
+- 1,197 of 28,054 reports (4.3%) have a PascalCase name: 1,175 on the function itself, and 22 on the binding that receives the result of the call the function is passed to, such as `{ GoogleAuthProvider: vi.fn(function () {}) }`.
 - Of 167 exported PascalCase functions, 58 (35%) matched a search for construction with `new`, `extends`, or `instanceof`, or have their `.prototype` read, in another file that names the module. For example, three.js `src/renderers/webgl/WebGLRenderStates.js` exports `function WebGLRenderStates(extensions)`, and `src/renderers/WebGLRenderer.js` runs `new WebGLRenderStates( extensions )`. The rule at `cb0105e` converts it, and the fix makes `new` throw `TypeError`.
 - Of 2,938 exported functions with other names, 37 (1.3%) matched the same search, and some matches are false, such as Mastodon's `history` reducer matching the word "history" in a comment.
 
@@ -64,7 +66,7 @@ Issue [#10](https://github.com/privatenumber/eslint-plugin-arrow/issues/10) is t
 **Decision:** report with a suggestion and no fix when all of these are true:
 
 - The function's binding has a PascalCase name, or the function is passed to a call whose result is bound to a PascalCase name.
-- The value reaches code that the rule cannot see: an export, an object property, a member assignment, or a call argument. A PascalCase function whose every use is visible keeps its fix, because the existing constructor checks already see each use.
+- The value reaches a use that the existing constructor checks do not follow: an export, an object property, an array element, a member assignment, a call argument, or a return. A PascalCase function used only through variables and aliases keeps its fix, because those checks already see each `new`. For example, `const types = [Widget]; new types[0]()` and a factory that returns `Widget` get the suggestion.
 - The function body does not return JSX. React and similar libraries call function components and never construct them, so a component is not a constructor.
 
 The JSX exception has no corpus measurement, because the corpus has little React code. It follows from how React calls function components. A report of a constructed function that returns JSX would justify removing it.
@@ -75,7 +77,9 @@ The JSX exception has no corpus measurement, because the corpus has little React
 
 The only breakage in the fix-then-test experiment came from object methods: 2 of 156 in Async. `async.autoInject` takes an object of task functions and reads each task's parameter names from their source, and its parser handles the converted arrow text differently. This is the `toString()` risk that the rule docs already list under "Code the rule cannot check". The risk is not specific to methods: any converted function's source changes. A principle that downgraded methods for it would have to downgrade every category. One parser in one test file is not enough evidence to do that (see [Rejected: default `objectMethods` to `false`](#rejected-default-objectmethods-to-false)).
 
-The rule docs claimed that converting an object method "does not change behavior". That claim was false, because `toString()` output changes. The docs now say what stays the same and what changes.
+Converting an object method also changes how TypeScript checks it. With `strictFunctionTypes`, TypeScript checks method parameters bivariantly and function-typed properties contravariantly ([../typescript/class-fields.md](../typescript/class-fields.md)), so an assignment that accepted a narrower parameter type can fail with `TS2322` after the fix. This fails at type-check time, not at runtime, and the same limit already applies to `classMethods`. It does not change the decision.
+
+The rule docs claimed that converting an object method "does not change behavior". That claim was false, because `toString()` output and parameter type checking change. The docs now say what stays the same and what changes.
 
 ### Type information
 
@@ -101,7 +105,7 @@ This is one reason to keep suggestions rare: in ESLint, each suggestion is a rep
 
 ### Corpus revisions
 
-The probe and the fix-then-test harness were scratch scripts and were not kept, as in [field-test.md](./field-test.md). To repeat the study, check out these revisions, run the rule with default options on the files described in [Corpus](#corpus), and label each report by where its value goes.
+The probe and the fix-then-test harness were scratch scripts and were not kept, as in [field-test.md](./field-test.md). A new run will not reproduce the counts exactly, because the labels depend on the probe's choices. To compare with these results, check out these revisions, run the rule with default options on the files described in [Corpus](#corpus), and label each report by its first use that leaves the function's variable. Each file was parsed with `@typescript-eslint/parser`, as `module` when it is `.mjs`, `.ts`, `.mts`, or `.tsx` or starts with `import` or `export`, and as `commonjs` otherwise.
 
 | Repository | Revision |
 | --- | --- |
@@ -128,7 +132,7 @@ The probe and the fix-then-test harness were scratch scripts and were not kept, 
 
 The draft policy offered a suggestion for every function whose value reaches code outside the file: call arguments, exports, stored values, and returns. It follows directly from what a single-file rule can know.
 
-Rejected because it removes the fix from 62% of reports (68% in test files), and the measured breakage in those categories is zero. In ESLint, a user would convert thousands of functions by hand. Prior art also fixes callbacks: `prefer-arrow-callback` and Biome `useArrowFunction` autofix them and never suggest.
+Rejected because it removes the fix from 58% of reports (62% in test files), and the measured breakage in those categories is zero. In ESLint, a user would convert thousands of functions by hand. Prior art also fixes callbacks: `prefer-arrow-callback` and Biome `useArrowFunction` autofix them and never suggest.
 
 ### Rejected: a list of callees that construct their argument
 
@@ -152,10 +156,10 @@ The safety argument rests on the two Async failures, which come from one source 
 
 `eslint-plugin-arrow@1.0.0` was published on 2026-11-04, so changes follow semver. This note applies [ESLint's semantic versioning policy](https://github.com/eslint/eslint#semantic-versioning-policy), which calls a change major when it is "likely to break your lint build".
 
-- **Suggestion instead of fix for constructor-named functions:** the rule reports the same functions. Only the fix changes, and the old fix makes `new` throw `TypeError`. This is a bug fix, released as a patch.
-- **The docs correction for object methods:** documentation, released as a patch.
+- **Suggestion instead of fix for constructor-named functions:** the rule reports the same functions, but `eslint --fix` no longer clears those reports. A lint build that ran `--fix` and passed can then fail, as when a bug fix reports more errors. ESLint's policy releases that case as a minor version, so this change is a `feat:`, a minor release. The old fix makes `new` throw `TypeError`, so keeping it is not an option.
+- **The docs correction for object methods:** documentation only, with no release of its own.
 
-No change in this policy alters an option, a schema, or an export, so none is breaking.
+No change in this policy alters an option, a schema, or an export, so none is a major release.
 
 ## Implementation
 

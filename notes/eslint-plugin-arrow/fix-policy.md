@@ -66,11 +66,14 @@ Issue [#10](https://github.com/privatenumber/eslint-plugin-arrow/issues/10) is t
 
 **Decision:** report with a suggestion and no fix when all of these are true:
 
+- The function can be constructed: a `function` declaration or expression that is not async or a generator. An exported `async function GET()`, such as a route handler, keeps its fix, because it has no `[[Construct]]` to lose.
 - The function has a constructor name, or it is passed to a call whose result is bound to a constructor name, as in `const URL = mock(function () {})`.
 - The function is used in a way other than a direct call. A function with a constructor name whose only uses are calls such as `Widget()` keeps its fix. Every other use, such as an export, `[Widget]`, `{ Widget }`, `Widget.bind(null)`, or `return Widget`, can lead to a `new` that the rule does not follow.
 - The function body does not return JSX. React and similar libraries call function components and never construct them, so a component is not a constructor.
 
 The second condition is stated as the one safe use, not as a list of unsafe uses, because reviews of earlier drafts kept finding uses that a list missed: returns, arrays, and `bind`.
+
+A known gap: an implementation installed on an existing mock, as in `Widget.mockImplementation(function () {})`, has no constructor name of its own, and the call result is not bound. Vitest 4 constructs it when code runs `new Widget()`. The receiver `Widget` has a constructor name, so the implementation PR should measure whether extending the signal to arguments of a method called on a constructor name costs fewer fixes than it saves. Mock factories received 2 functions in the corpus, so the evidence for either choice is thin.
 
 The JSX exception is a convention, like the constructor name itself. React and similar libraries call function components and never construct them. Code can still construct a function that returns JSX, for example through a mock, but no case has been observed. The corpus has little React code, so the exception has no measurement. A report of a constructed function that returns JSX would justify removing it.
 
@@ -181,7 +184,7 @@ No change in this policy alters an option's schema or an export. One change alte
 
 ## Implementation
 
-Two changes, each in its own PR:
+Three changes, each in its own PR:
 
 1. Add `meta.hasSuggestions` and the suggestion tier for functions with a constructor name that are used other than by direct calls, with tests for each signal and for the JSX exception. This resolves #10.
 2. Change the `objectMethods` default to `false`, and update the rule docs, the README, and the options note.

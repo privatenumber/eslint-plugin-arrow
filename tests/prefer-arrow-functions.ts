@@ -183,6 +183,22 @@ describe('prefer-arrow-functions', () => {
 				name: 'function toString / nested in a class',
 				code: 'class A { b(){ c(function(){}) } }\nA.toString()',
 			},
+			{
+				name: 'function toString / nested in a class that reads its own source',
+				code: 'class A { static { A.toString() } b(){ c(function(){}) } }',
+			},
+			{
+				name: 'function toString / nested in a class that reads its own source through an alias',
+				code: 'class A { static { const d = A; d.toString() } b(){ c(function(){}) } }',
+			},
+			{
+				name: 'function toString / nested in a declaration that shares a parameter name',
+				code: '(a) => { function a(){ return function(){} } a.toString() }',
+			},
+			{
+				name: 'function toString / nested in a repeated declaration',
+				code: '() => { var a = 1; function a(){ return function(){} } a.toString() }',
+			},
 
 			// Ignores generators
 			{
@@ -2073,6 +2089,234 @@ describe('prefer-arrow-functions', () => {
 					output: '(class{ a = () => { return this } })',
 				},
 			],
+		});
+	});
+
+	describe('aliases', () => {
+		const errors = [{ messageId: 'preferArrowFunction' as const }];
+		const cases = {
+			valid: [
+				...[
+					'function f(){} const g = ({ prototype } = f) => prototype',
+					'function f(){} const g = ({ x: { prototype } = f }) => prototype',
+					'function f(){ return function(){} } const g = ({ toString } = f) => toString.call(f)',
+					'function f(){} new (x ? f : y)()',
+					'function f(){} (x || f).name',
+					'let f; f = function(){}; new f()',
+					'let f; f = function(){}; f.name',
+					'function f(){} const { prototype } = f',
+					'function f(){} let name; ({ name } = f)',
+					'function f(){} let prototype; ({ prototype } = f)',
+					'function f(){} const b = ({} = f); new b()',
+					'function f(){} const b = ([] = f); new b()',
+					'function f(){} const { ["prototype"]: c } = x || f',
+					'function f(){} const { [`prototype`]: c } = f',
+					'function f(){} f[`prototype`]',
+					'function f(){} const g = (b = f) => new b()',
+					'function f(){} { var b = f } new b()',
+					'function a(){} function f(b = a){ return new b() } f.name',
+					'function f(){} const g = ({ b = f }) => new b()',
+					'function f(){} const g = (b = f) => { b = function(){}; new b() }',
+					'const g = (b = function(){}) => new b()',
+					'function f(){} const b = (0, f); new b()',
+					'function f(){} new (0, f)()',
+					'function f(){} let b = (0, f); b = function(){}; new b()',
+					'const a = true ? function(){} : Object; const b = a; new b()',
+					'new (true ? function(){} : Object)()',
+					'function a(){} let b; const c = b = a; new c()',
+					'let a, b; const c = b = a = function(){}; a = function(){}; new c()',
+					'function a(){ return function(){} } const b = a; (b || Object).toString()',
+					'function a(){ return function(){} } const b = a; const { toString } = b',
+					'let a; a = function(){ return function(){} }; const b = a; b.toString()',
+					// Reassignments connect both functions to the same conservative alias group.
+					'function f(){} function g(){} let a = f; a = g; new a()',
+				].map(code => ({ code })),
+				{
+					name: 'aliases / declaration new',
+					code: 'function a(){} const b = a; new b()',
+				},
+				{
+					name: 'aliases / expression new',
+					code: 'const a = function(){}; const b = a; new b()',
+				},
+				{
+					name: 'aliases / assignment',
+					code: 'function a(){} let b; b = a; new b()',
+				},
+				{
+					name: 'aliases / chain',
+					code: 'function a(){} const b = a; const c = b; new c()',
+				},
+				{
+					name: 'aliases / cycle',
+					code: 'function f(){} let a = f; let b = a; a = b; new b()',
+				},
+				{
+					name: 'aliases / instanceof',
+					code: 'function a(){} const b = a; x instanceof b',
+				},
+				{
+					name: 'aliases / extends',
+					code: 'function a(){} const b = a; class c extends b {}',
+				},
+				{
+					name: 'aliases / prototype',
+					code: 'function a(){} const b = a; b.prototype',
+				},
+				{
+					name: 'aliases / toString',
+					code: 'function a(){} const b = a; b.toString()',
+				},
+				{
+					name: 'aliases / nested function source read',
+					code: 'function a(){ return function(){} } const b = a; b.toString()',
+				},
+				{
+					name: 'aliases / conditional consequent',
+					code: 'function a(){} const b = x ? a : y; new b()',
+				},
+				{
+					name: 'aliases / conditional alternate',
+					code: 'function a(){} const b = x ? y : a; new b()',
+				},
+				{
+					name: 'aliases / and',
+					code: 'function a(){} const b = x && a; new b()',
+				},
+				{
+					name: 'aliases / or',
+					code: 'function a(){} const b = a || x; new b()',
+				},
+				{
+					name: 'aliases / nullish',
+					code: 'function a(){} const b = x ?? a; new b()',
+				},
+				{
+					name: 'aliases / nested wrappers',
+					code: 'function a(){} const b = x ? (y || a) : z; new b()',
+				},
+			],
+			invalid: [
+				...[
+					['function f(){} const { call } = f', 'const f = () => {}; const { call } = f'],
+					['function f(){} let call; ({ call } = f)', 'const f = () => {}; let call; ({ call } = f)'],
+					['function f(){} const { [k]: v } = f', 'const f = () => {}; const { [k]: v } = f'],
+					['function f(){} const { ...rest } = f', 'const f = () => {}; const { ...rest } = f'],
+					['function f(){} const b = (f, Object); new b()', 'const f = () => {}; const b = (f, Object); new b()'],
+					['o.f = function(){}', 'o.f = () => {}'],
+					['let f; f = function(){}; f()', 'let f; f = () => {}; f()'],
+				].map(([code, output]) => ({
+					code,
+					output,
+					errors,
+				})),
+				{
+					name: 'aliases / nested function source not read',
+					code: 'const a = () => { return function(){} }; const b = a; b()',
+					output: 'const a = () => { return () => {} }; const b = a; b()',
+					errors,
+				},
+				{
+					name: 'aliases / called',
+					code: 'function a(){} const b = a; b()',
+					output: 'const a = () => {}; const b = a; b()',
+					errors,
+				},
+				// Object properties are not followed
+				{
+					name: 'aliases / object boundary',
+					code: 'function a(){} const b = { a }; new b.a()',
+					output: 'const a = () => {}; const b = { a }; new b.a()',
+					errors,
+				},
+				{
+					name: 'aliases / shadowing',
+					code: 'function a(){} { const b = a; b() } { const b = x; new b() }',
+					output: 'const a = () => {}; { const b = a; b() } { const b = x; new b() }',
+					errors,
+				},
+				{
+					name: 'aliases / conditional test',
+					code: 'function a(){} const b = a ? x : y; new b()',
+					output: 'const a = () => {}; const b = a ? x : y; new b()',
+					errors,
+				},
+				{
+					name: 'aliases / compound assignment',
+					code: 'function a(){} let b = x; b ||= a; new b()',
+					output: 'const a = () => {}; let b = x; b ||= a; new b()',
+					errors,
+				},
+				{
+					name: 'aliases / reassignment',
+					code: 'function a(){} let b = a; b = x; b()',
+					output: 'const a = () => {}; let b = a; b = x; b()',
+					errors,
+				},
+				{
+					name: 'aliases / cycle without constructor',
+					code: 'function f(){} let a = f; let b = a; a = b; b()',
+					output: 'const f = () => {}; let a = f; let b = a; a = b; b()',
+					errors,
+				},
+			],
+		};
+		describe('typescript parser', () => {
+			ruleTester.run('prefer-arrow-functions', preferArrowFunctions, cases);
+			ruleTester.run('typescript alias wrappers', preferArrowFunctions, {
+				valid: [
+					...[
+						'function f(){} new (f as any)()',
+						'function f(){} (f as any).name',
+						'function f(){} f!.name',
+						'function f(){} (f satisfies any).prototype',
+						'function f(){} (<any>f).prototype',
+						'function f(){} const { name } = f as any',
+						'const a = (function(){} as any); const b = a; new b()',
+						'new (function(){} as any)()',
+						'function f<T>(){} const g = f<string>; new g()',
+						'function f<T>(){} new (f<string>)()',
+						'let b: any; b! = function(){}; new b()',
+						'let b: any; (b as any) = function(){}; new b()',
+						'let b: any; (<any>b) = function(){}; new b()',
+						'let b: any; (b satisfies any) = function(){}; new b()',
+						'let b: any; const c = (b! = function(){}); b = function(){}; new c()',
+						'let b: any; const c = ((b as any) = function(){}); b = function(){}; new c()',
+						'let b: any; const c = ((<any>b) = function(){}); b = function(){}; new c()',
+						'let b: any; const c = ((b satisfies any) = function(){}); b = function(){}; new c()',
+						'function f(){} let b: any; b! = f; new b()',
+						'function f(){} let b: any; const c = (b! = f); new c()',
+						'function f(){} const b = (({} = f) as any); new b()',
+						'function f(){} const a = f; const { ["prototype" as const]: p } = a',
+						'function f(){} const a = f; a["prototype" as const]',
+						'function f(){} f["prototype" satisfies string]',
+						'function f(){} f["prototype"!]',
+						'function f(){} f[<string>"prototype"]',
+						'function f(){} const g = (b = f as any) => new b()',
+					].map(code => ({ code })),
+					{
+						name: 'aliases / as',
+						code: 'function a(){} const b = a as typeof a; new b()',
+					},
+					{
+						name: 'aliases / satisfies',
+						code: 'function a(){} const b = a satisfies typeof a; new b()',
+					},
+					{
+						name: 'aliases / non-null',
+						code: 'function a(){} const b = a!; new b()',
+					},
+					{
+						name: 'aliases / assertion',
+						code: 'function a(){} const b = <typeof a>a; new b()',
+					},
+				],
+				invalid: [],
+			});
+		});
+		describe('javascript parser', () => {
+			const eslintRuleTester = new EslintRuleTester();
+			eslintRuleTester.run('prefer-arrow-functions', preferArrowFunctions as unknown as Rule.RuleModule, cases);
 		});
 	});
 

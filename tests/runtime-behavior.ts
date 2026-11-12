@@ -101,6 +101,12 @@ const observe = (
 const fixtures: Fixture[] = [
 	// Known behavior changes: the rule must leave these alone
 	{
+		name: 'destructured prototype',
+		sourceType: 'commonjs',
+		code: 'function f() {}\nconst { prototype } = f; prototype.x = 1; log(prototype.x)',
+		changes: changesInAll(false),
+	},
+	{
 		name: 'object __proto__ method',
 		sourceType: 'module',
 		code: 'const o = { __proto__() { return 1 } }\nlog(Object.getPrototypeOf(o) === Object.prototype, typeof o.__proto__)',
@@ -369,6 +375,12 @@ log(build(), build.prototype.extra);`,
 	read() { return 'read' }
 }
 log(Example.prototype.read.call({}));`,
+		changes: changesInAll(false),
+	},
+	{
+		name: 'constructor through alias',
+		sourceType: 'module',
+		code: 'function A() { return { value: 1 } }\nconst B = A;\nlog(new B().value);',
 		changes: changesInAll(false),
 	},
 	{

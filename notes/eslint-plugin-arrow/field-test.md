@@ -16,7 +16,7 @@ Each repository was cloned at its latest release tag. The plugin was installed f
 
 Failures that also happened on the baseline, or only under parallel load, were classified as flaky and excluded. Those logs were not kept.
 
-The harness scripts were not kept either. To repeat the historical run, use the 1.x plugin at revision `2649417` and a config like this one, which applies the settings above. The globs are examples; match them to how each repository runs its files:
+The harness scripts were not kept, and the exact pre-release plugin revision was not recorded. Version 1.0.0 is the closest published version that still accepts `classMethods`, but its results will differ from the historical run. To run a similar test, use a config like this one, which applies the settings above. The globs are examples; match them to how each repository runs its files:
 
 <!-- eslint-skip -->
 ```js

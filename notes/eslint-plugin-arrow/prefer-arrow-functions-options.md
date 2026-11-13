@@ -158,6 +158,8 @@ An arrow function gets a name from where it is defined: a variable, an assignmen
 
 **Removed in 2.0.** Name-wide exclusions suppress unrelated functions and can become stale without notice. See [fix policy](./fix-policy.md). The research below describes 1.x.
 
+With ESLint 10.13.0 and both rules enabled, `verifyAndFix` on `function a() { return f(); }\n// eslint-disable-next-line arrow/prefer-arrow-functions\nexport function f() { return 1; }\na();` removes the unused directive and converts `f` to `export const f = () => { return 1; };`. The earlier reference prevents `prefer-arrow-functions` from reporting `f` on the first pass; `no-function-hoisting` moves it, and a later pass converts it. With `reportUnusedDisableDirectives: 'off'`, the directive survives and `f` stays a declaration. **Decision:** still remove `allowedNames`; recommend a file-level config override first, or move the declaration before adding a per-function disable comment.
+
 **What it keeps:** functions whose own name, assigned variable or property name, or method name is in the list. Private methods include the `#`. Names match exactly.
 
 ### Why a config option, when disable comments exist

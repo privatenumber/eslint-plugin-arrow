@@ -397,6 +397,9 @@ export const noFunctionHoisting = createRule<Options, 'noFunctionHoisting'>({
 			const signatureCount = functionVariable.defs.length - 1;
 			const isMovable = (
 				isFunctionVariable(functionVariable)
+				// Annex B may assign an outer binding at runtime; compiler settings can change strictness
+				&& functionVariable.scope.type !== 'block'
+				&& functionVariable.scope.type !== 'switch'
 				&& statements !== undefined
 				&& statements.indexOf(statement) - statements.indexOf(groupStart) === signatureCount
 			);

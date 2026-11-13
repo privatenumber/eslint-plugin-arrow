@@ -10,7 +10,7 @@ Declaring functions before use also lets [`prefer-arrow-functions`](./prefer-arr
 
 ## Behavior
 
-The fix moves the declaration, with the comments directly above it and on its last line, to just before the first statement that uses it. A JSDoc comment (`/** ... */`) moves with the function even when a blank line separates them, and so does the blank line after the function. Comments directly above that statement, such as JSDoc and `// eslint-disable-next-line`, stay attached to it. Moving a function declaration earlier in its own scope does not change behavior, because the function is already defined from the start of the scope.
+The fix moves the declaration, with the comments directly above it and on its last line, to just before the first statement that uses it. A JSDoc comment (`/** ... */`) moves with the function even when a blank line separates them, and so does the blank line after the function. Comments directly above that statement, such as JSDoc and `// eslint-disable-next-line`, stay attached to it. Some declarations are reported without a fix, as described in [Limitations](#limitations).
 
 Comments that apply to the code below them stay above the moved code, and move with nothing:
 
@@ -88,6 +88,7 @@ function typeHelper() {}
 
 - TypeScript overload signatures move together with their implementation, and moved functions are never inserted between another function's signatures and its implementation.
 - Other repeated declarations of the same name, such as a `var` or a merged `namespace`, are reported but not fixed.
+- Functions declared in a block or `switch` case in non-strict code are reported but not fixed. Moving the declaration can change when its [outer binding](https://tc39.es/ecma262/#sec-block-level-function-declarations-web-legacy-compatibility-semantics) receives the function.
 - A declaration is only moved within its own statement list. If the first use is elsewhere, the error is reported without a fix.
 - A declaration below a `/* eslint-disable */` block directive leaves the directive in place, so the moved function is no longer covered by it. ESLint then reports the function's problems instead of hiding them. Moving the directive would hide problems in all the code between its new and old places.
 

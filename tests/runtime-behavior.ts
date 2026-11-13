@@ -125,6 +125,12 @@ const fixtures: Fixture[] = [
 		changes: changesInAll(false),
 	},
 	{
+		name: 'Annex B outer binding during block execution',
+		sourceType: 'commonjs',
+		code: 'var peek = () => typeof a; { log(peek()); a(); log(peek()); function a(){} }',
+		changes: changesInAll(false),
+	},
+	{
 		name: 'script global function',
 		sourceType: 'script',
 		code: 'function a() { return 1 }\nlog(typeof globalThis.a)',

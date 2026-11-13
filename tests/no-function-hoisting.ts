@@ -504,6 +504,40 @@ describe('no-function-hoisting', () => {
 			],
 			invalid: [
 				{
+					name: 'sloppy block is reported without a fix',
+					code: 'var peek = () => typeof a; { peek(); a(); function a(){} }',
+					languageOptions: { sourceType: 'commonjs' },
+					errors: [error('a')],
+					output: null,
+				},
+				{
+					name: 'sloppy switch case is reported without a fix',
+					code: 'var peek = () => typeof a; switch (1) { case 1: peek(); a(); function a(){} }',
+					languageOptions: { sourceType: 'script' },
+					errors: [error('a')],
+					output: null,
+				},
+				{
+					name: 'module block is fixed',
+					code: '{ a(); function a(){} }',
+					errors: [error('a')],
+					output: '{ function a(){}a();  }',
+				},
+				{
+					name: 'strict switch case is fixed',
+					code: '"use strict"; switch (1) { case 1: a(); function a(){} }',
+					languageOptions: { sourceType: 'script' },
+					errors: [error('a')],
+					output: '"use strict"; switch (1) { case 1: function a(){}a();  }',
+				},
+				{
+					name: 'sloppy function body is fixed',
+					code: 'function b(){ a(); function a(){} }',
+					languageOptions: { sourceType: 'script' },
+					errors: [error('a')],
+					output: 'function b(){ function a(){}a();  }',
+				},
+				{
 					code: 'a();\nfunction a(){}\n',
 					errors: [error('a')],
 					output: 'function a(){}\na();\n',

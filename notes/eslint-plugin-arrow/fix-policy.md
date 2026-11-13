@@ -12,7 +12,7 @@ Status: decided 2026-11-12. Extended on 2026-11-13 by an audit of the rule's opt
 4. **Fix everything else.** This includes call arguments, exports, and values stored in objects and arrays. The tested breakage rate for these is zero (see [Measured breakage](#measured-breakage)).
 5. **Downgrade a tier only with evidence of risk, not because a risk is possible.** Every category outside the file has a possible risk. Downgrading all of them would remove most of the rule's fixes (see [Rejected: suggest for every value that leaves the file](#rejected-suggest-for-every-value-that-leaves-the-file)).
 6. **Default off an option whose syntax alone changes TypeScript checking.** `objectMethods` changes to default `false` (see [Object methods](#object-methods)).
-7. **No option opts into a fix that silently changes runtime behavior.** An option may widen what the rule converts only when its fixes fit the same model as the default fixes. `objectMethods` fits: its runtime change, `toString()` output, applies to every fix. Its TypeScript change is documented with the option and often surfaces as a type error, though it can also change a type without an error, as in a conditional type that compares method signatures. `classMethods` and `namedFunctionExpressions` did not fit, and 2.0 removes them, together with `allowedNames` (see [Removed options](#removed-options)).
+7. **No option opts into a fix that silently changes runtime behavior.** An option may widen what the rule converts only when its fixes carry the same risks as the default fixes. `objectMethods` does (see [Object methods](#object-methods)). `classMethods` and `namedFunctionExpressions` do not, and 2.0 removes them, together with `allowedNames` (see [Removed options](#removed-options)).
 8. **Types do not change the tier in 2.0.** A typed mode could add skips and suggestions but never fixes, and it waits on a measurement (see [Type information](#type-information)).
 
 ## Evidence
@@ -101,6 +101,8 @@ declare const narrow: { handle(x: D): void }
 export const ok: typeof wide = narrow // TS2322 after the fix
 ```
 
+The change does not always surface as an error. A conditional type that compares method signatures, such as `{ handle(x: D): void } extends typeof wide ? true : false`, can change its result with no diagnostic. When enabled, the option's only runtime change is `toString()` output, which every fix has.
+
 [CONTRIBUTING.md](../../CONTRIBUTING.md) makes correctness the first priority and skips a conversion when the file shows it changes TypeScript checking. A method's syntax alone carries this change, so a default-on conversion contradicts that priority. The options note had called `objectMethods` a style option with "no observable difference" ([prefer-arrow-functions-options.md](./prefer-arrow-functions-options.md#objectmethods)), which this finding corrects.
 
 Other evidence points the same way:
@@ -131,7 +133,7 @@ The option converted class methods to arrow class fields. A public instance fiel
 | Async | The suite failed before any test ran. Its Babel 6 parser rejects class fields, starting with `removeLink` in `lib/internal/DoublyLinkedList.js:11`. Without `lib/`, no other failure appeared. |
 | Axios | `AxiosHeaders#set` (`lib/core/AxiosHeaders.js:216`) became an own property, which `clear()` deletes. 41 of 93 tests in the headers suite failed. The full suite stalled, so the total is not known. |
 
-Framework lifecycle methods are a separate break. Angular, Vue class components, and custom elements read lifecycle hooks from the prototype, so a hook converted to a field is never called. The rule kept custom element callbacks with a static name, such as `connectedCallback`, including a computed string key such as `['connectedCallback']`. It did not keep other frameworks' hooks, or a callback whose computed key is an expression such as `[key]`. Angular Components had 401 lifecycle-named methods in the scan, all in decorated classes. ESLint core `prefer-arrow-callback` and Biome `useArrowFunction` do not convert methods ([prior-art.md](./prior-art.md)). typescript-eslint keeps a fix that changes behavior behind an option named for the risk, `allowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing` in [`prefer-optional-chain`](https://typescript-eslint.io/rules/prefer-optional-chain/), and offers suggestions otherwise. No safe subset of class methods was found, and a suggestion for each of thousands of methods would not be useful, so the option was removed rather than downgraded.
+Framework lifecycle methods are a separate break. Angular, Vue class components, and custom elements read lifecycle hooks from the prototype, so a hook converted to a field is never called. The rule kept custom element callbacks with a static name, such as `connectedCallback`, including a computed string key such as `['connectedCallback']`. It did not keep other frameworks' hooks, or a callback whose computed key is an expression such as `[key]`. Angular Components had 401 lifecycle-named methods in the scan, all in decorated classes. typescript-eslint keeps a fix that changes behavior behind an option named for the risk, `allowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing` in [`prefer-optional-chain`](https://typescript-eslint.io/rules/prefer-optional-chain/), and offers suggestions otherwise. No safe subset of class methods was found, and a suggestion for each of thousands of methods would not be useful, so the option was removed rather than downgraded.
 
 #### `namedFunctionExpressions`
 
@@ -145,114 +147,17 @@ The option listed exact names that the rule never converts. The rule docs recomm
 - **It is broad.** A name matches every function with that name in the files the config object selects, which is every file unless the user scopes the option with `files`. In Async, listing the two `autoInject` methods that broke (`a` and `task5`) also kept 7 unrelated functions.
 - **It does not fix whole classes of breakage.** With `classMethods`, listing `removeLink` only moved the Async parse error to the next method, `empty`.
 
-Stale entries are never reported, so the list only grows. The lifecycle use goes away with `classMethods`. The cross-file use remains, and removing the option loses one capability: a single entry that keeps every function with a name, such as a lowercase `factory` that consumers construct, across many modules. The docs now point to an `eslint-disable-next-line` comment for each function, which is local and which ESLint reports when stale with `reportUnusedDisableDirectives`, and to a config object with `files` that turns the rule off for some files. ESLint does not report a stale `files` override. A disable comment has one more limit: ESLint can remove it as unused before `no-function-hoisting` moves the function and `prefer-arrow-functions` reports it, so the rule docs say to move the declaration above its uses before adding the comment, and list the `files` override first. A codebase with many such functions needs more comments than one list entry, which also makes each exception visible where it applies.
+Stale entries are never reported, so the list only grows. The lifecycle use goes away with `classMethods`. The cross-file use remains, and removing the option loses one capability: a single entry that keeps every function with a name, such as a lowercase `factory` that consumers construct, across many modules. The replacements are a config object with `files` that turns the rule off for some files, and a disable comment for each function. ESLint does not report a stale `files` override. The rule docs' "Migrating from 1.x" section owns the guidance on using them, including when `eslint --fix` can remove a disable comment, as recorded in [prefer-arrow-functions-options.md](./prefer-arrow-functions-options.md).
 
-GitHub code search found no external config that uses any of the three options. Indexed files are not a full count of users, but `eslint-plugin-arrow@1.0.0` was published on 2026-11-04, so few configs can depend on them.
+GitHub code search found no external config that uses any of the three options. Indexed files are not a full count of users, but `eslint-plugin-arrow@1.0.0` was published on 2026-11-04, so changes follow semver. Releases publish only from `master` and `beta` (`.github/workflows/release.yml`). Changes merged to `develop` collect there, so all of these ship together as 2.0.0 when `develop` is merged into `master`. The release is major because of the removed options. A config that passes `classMethods`, `namedFunctionExpressions`, or `allowedNames` fails schema validation, which breaks the lint build ([ESLint's semantic versioning policy](https://github.com/eslint/eslint#semantic-versioning-policy) calls a change major when it is "likely to break your lint build").
 
-### Other fix paths
+Each change still needs a commit type, which semantic-release reads:
 
-The audit also checked the fixes that stay:
-
-| Fix | What can change | Decision |
-| --- | --- | --- |
-| Declaration to `const` | Hoisting, which the rule checks in the file. Calls from an import cycle before the module runs, which it cannot see. | Keep. 0 of 134 exports broke in the tests. |
-| Function expression to arrow | `this`, `arguments`, and `new`, which the rule checks in the file. Source text. | Keep. |
-| Object method to arrow property | `toString()` output, TypeScript parameter checking | Keep, behind `objectMethods`, default `false` |
-| Function passed to `Reflect.construct` | The arrow cannot be constructed. The rule follows `new` but not this built-in. | Bug: keep the function. |
-
-In `no-function-hoisting`, the move fix changed behavior for a declaration in a block or `switch` case in code that is not strict. [Annex B.3.3](https://tc39.es/ecma262/#sec-block-level-function-declarations-web-legacy-compatibility-semantics) assigns the function to the outer `var` binding only when the declaration statement runs, so moving the statement earlier changes what code outside the block sees. In a CommonJS reproduction, `typeof f` read through an outer function logged `undefined undefined` before the fix and `undefined function` after it. Whether code is strict after compilation depends on settings the linter cannot see, such as TypeScript's `alwaysStrict` and `moduleDetection`, and on downleveled namespaces and class static blocks. So that rule keeps reporting the same declarations, but offers no fix for one in a block or `switch` case, strict or not ([#28](https://github.com/privatenumber/eslint-plugin-arrow/pull/28)). In the corpus, 9 of its 4,253 fixable reports (0.2%) are in a block or `switch` case. `prefer-arrow-functions` has the same gap. It skips a block declaration only when the parser marks the scope as not strict, and converting it to a block-scoped `const` removes the outer binding. In TypeScript compiled with `alwaysStrict: false` and `moduleDetection: 'legacy'`, `eval('typeof f')` in an outer function returned `'function'` before the fix and `'undefined'` after it, although ESLint parsed the file as a module. So `prefer-arrow-functions` will skip every block and `switch` case declaration too (see [Implementation](#implementation)).
-
-### Type information
-
-[type-safety.md](./type-safety.md#decision-no-type-aware-mode) rejected a type-aware mode. A probe with TypeScript 5 and Vitest 4.1.12 tested whether types could resolve #10:
-
-- The contextual type of the function in `vi.fn(function () {})` is `(() => { a: number }) | undefined`, with call signatures only. Inference erases the construct possibility.
-- The declared parameter of the selected overload is `T | undefined` with `T extends Procedure | Constructable`. Resolving the constraint shows a construct signature. So the declared parameter type, not the contextual type, can detect a callee that may construct.
-- A call-only type proves nothing: JavaScript callers, casts, and `any` can still construct the function. Types can add caution, but cannot prove a fix safe.
-- Callees declared in `typescript/lib/lib.*.d.ts` have spec-defined behavior. Most, such as `Array.prototype.map` and `addEventListener`, only call their callback, but some construct it, such as `Reflect.construct`. So the declaration file alone does not prove a callback safe, and a typed mode would still need the declared parameter type. This policy fixes callbacks to the other callees anyway, and keeps functions passed to `Reflect.construct` (see [Implementation](#implementation)).
-
-A second exploration on 2026-11-13 (TypeScript 6.0.3, `@typescript-eslint/parser` 8.72.2, ESLint 10.14.0) tested each limitation in the rule docs with small fixture projects and the compiler API. Types help with three checks:
-
-- **Skip:** an annotated return type that resolves to `never`, including an alias imported from another file. The syntax-only check follows type aliases declared in the same file only.
-- **Skip:** a function declaration merged with a declaration in another file, such as a `declare module` augmentation. After the conversion, both files fail with `TS2451`. The checker's symbol lists every merged declaration.
-- **Suggestion:** a callback passed to a parameter whose declared type, after resolving constraints, has a construct signature in it or in one of its union members. TypeScript reports no construct signature for the union as a whole, so the check must inspect each member of the uninstantiated declaration's constraint. This catches `W.mockImplementation(function () {})`, the gap in [Constructor names](#constructor-names). The declared type allows construction but does not prove it, so this is a suggestion, not a skip.
-
-Types cannot turn a suggestion or a skip into a fix. The language service's `findReferences` found renamed imports, re-exports, and `export *`, but missed a function stored in an object and read back (`new o.renamed()`), and a CommonJS `require` destructured in another checked file. Code outside the program, such as consumers of a published package, is never visible. So finding no use does not prove a function safe. Most other limitations, such as class field semantics, `this`, `arguments`, and `toString()`, are runtime facts that types do not describe.
-
-Cost: on 98 files of Vite `src/node`, a trivial typed rule took 1.4 to 2 times the wall time and 1.2 to 1.6 times the peak memory of the same untyped rule, in two runs. Vite's dependencies were not installed, so unresolved types make this a low estimate. The runs did not include reference searches.
-
-A typed mode must be an explicit option that fails when the parser provides no type information. typescript-eslint maintainers advise against rules that silently change behavior when types happen to be available, because a misconfigured project then loses coverage without notice ([typescript-eslint#7124](https://github.com/typescript-eslint/typescript-eslint/issues/7124)). Oxlint's [JS plugin docs](https://oxc.rs/docs/guide/usage/linter/js-plugins.html#api-support) still list type-aware rules as unsupported, so the mode would be ESLint-only.
-
-**Decision:** 2.0 stays syntax-only. Before designing a typed mode, measure it: run each typed check on TypeScript repositories with their dependencies installed, and count how many reports it adds and how many of those are real problems. This is a follow-up after 2.0.
-
-**Revisit when** that measurement shows the checks find enough real problems to justify the cost, when Oxlint gives JS plugins type information, or when a report shows a constructed callback that has no constructor name. A typed mode would treat `any`, `Function`, and unresolved types as unknown.
-
-### Tool support for suggestions
-
-A suggestion is useful only if users can apply it. ESLint and Oxlint differ:
-
-- **ESLint 10.13.0:** the CLI applies fixes only. `--fix-type` filters fixes by the rule's `meta.type` (`problem`, `suggestion`, `layout`) or by the `directive` category for unused disable directives. It never applies suggestion edits. Editors apply suggestions one at a time. [`eslint-interactive`](https://github.com/mizdra/eslint-interactive) can apply them in bulk.
-- **Oxlint 1.90.0:** `--fix` applies fixes only. `--fix-suggestions` applies fixes and the first suggestion of each report, including JS plugin suggestions ([../oxlint/js-plugins.md](../oxlint/js-plugins.md#suggestions)).
-
-This is one reason to keep suggestions rare: in ESLint, each suggestion is a report the user resolves by hand.
-
-### Corpus revisions
-
-The probe and the fix-then-test harness were scratch scripts and were not kept, as in [field-test.md](./field-test.md). A new run will not reproduce the counts exactly, because the labels depend on the probe's choices. To compare with these results, check out these revisions, run the rule with default options on the files described in [Corpus](#corpus), label each report with every use of its value that the probe follows, and count it in the first category of the priority order in [Corpus](#corpus). The probe follows a value through variable references, assignments to variables, and the same wrappers the rule follows (parentheses, TypeScript assertions, conditional and logical operands, and the last comma operand). It labels the use at the end: a call argument, an object or array element, a member assignment, an export, a return, or a direct call. Each file was parsed with `@typescript-eslint/parser`, as `module` when it is `.mjs`, `.ts`, `.mts`, or `.tsx` or starts with `import` or `export`, and as `commonjs` otherwise. The ESLint config must list each extension in `files`, as in `**/*.ts` (see [Correction](#correction-typescript-and-jsx-files)).
-
-| Repository | Revision | Reports |
-| --- | --- | ---: |
-| axios/axios | `4ee8d46fc463` | 599 |
-| caolan/async | `3921e54bd070` | 979 |
-| date-fns/date-fns | `a9739fb3e538` | 650 |
-| eslint/eslint | `480afad6e7ef` | 3,709 |
-| excalidraw/excalidraw | `701b901a0f1b` | 211 |
-| expressjs/express | `43fca52d28a4` | 2,764 |
-| jestjs/jest | `aa88f7cf0bfc` | 1,077 |
-| jquery/jquery | `feaa9fcdb68c` | 3,231 |
-| lodash/lodash | `2b5e6f7399a7` | 362 |
-| mastodon/mastodon | `b31c484d97c9` | 743 |
-| mrdoob/three.js | `6da7f45ef789` | 5,453 |
-| nodejs/undici | `09ed1694f809` | 1,878 |
-| prettier/prettier | `8cd4ec1248fd` | 2,919 |
-| vitejs/vite | `bd32fea2cb17` | 1,421 |
-| vitest-dev/vitest | `f4fdbcae08ec` | 1,980 |
-| webpack/webpack | `00c67af54e09` | 5,626 |
-
-The option audit used the same probe with each option enabled, and the same fix-then-test harness and commands. The fix-then-test runs installed dependencies with `npm ci --ignore-scripts` (`npm install --ignore-scripts` for Express, which has no lockfile), then ran `npm test` (Express), `npm run mocha-node-test` (Async), `npm run test:main` after the documented build (Lodash), and `npm run test:vitest:unit` (Axios).
-
-## Rejected alternatives
-
-### Rejected: suggest for every value that leaves the file
-
-The draft policy offered a suggestion for every function whose value reaches code outside the file: call arguments, exports, stored values, and returns. It follows directly from what a single-file rule can know.
-
-Rejected because it removes the fix from 56% of reports (59% in test files), and the measured breakage in those categories is zero. In ESLint, a user would convert thousands of functions by hand. Prior art also fixes callbacks: `prefer-arrow-callback` and Biome `useArrowFunction` autofix them and never suggest.
-
-### Rejected: a list of callees that construct their argument
-
-A list such as `vi.fn` and `mockImplementation` was proposed for #10. Rejected because the set of libraries is open, and a list is never complete. The constructor-name signal works for any library.
-
-### Rejected: an `allowedCallees` option
-
-Rejected for the same reason: each user would have to find every constructing callee, and the option does not scale. It would also repeat the problems of `allowedNames`, which 2.0 removes (see [Removed options](#allowednames)). A `files` override or a disable comment already keeps a function (see [`allowedNames`](#allowednames)).
-
-### Rejected: skip PascalCase functions
-
-Skipping would avoid a report that a user must resolve. Rejected because the search in [Constructor names](#constructor-names) found no construction in other files for 80% of exported PascalCase functions. The search can miss renamed imports, re-exports, and consumers outside the repository, and it also has false matches, so 80% is an estimate. A skip would hide all of them from the rule, and a suggestion still lets an editor or `oxlint --fix-suggestions` convert them on purpose.
-
-## Versioning
-
-`eslint-plugin-arrow@1.0.0` was published on 2026-11-04, so changes follow semver. This note applies [ESLint's semantic versioning policy](https://github.com/eslint/eslint#semantic-versioning-policy), which calls a change major when it is "likely to break your lint build".
-
-- **Suggestion instead of fix for constructor-named functions:** the rule reports the same functions, but `eslint --fix` no longer clears those reports. A lint build that ran `--fix` and passed can then fail, as when a bug fix reports more errors. ESLint's policy releases that case as a minor version, so this change is a `feat:`, a minor release. The old fix makes `new` throw `TypeError`, so keeping it is not an option.
-- **`objectMethods` default `false`:** the rule reports fewer functions by default. A build can still fail when it reports unused disable directives as errors (`reportUnusedDisableDirectives: 'error'`), because a disable comment above an object method no longer suppresses anything. ESLint's policy accepts this effect for changes that report fewer errors, which it releases as patches. This change alters a default rather than fixing a bug, so it is a `feat:`. It ships in the same PR as the removed options. Users who want the old behavior set `objectMethods: true`.
-- **Removed options:** a config that passes `classMethods`, `namedFunctionExpressions`, or `allowedNames` fails schema validation, which breaks the lint build. This is a major release. The commit uses a `BREAKING CHANGE:` footer, because semantic-release's default Angular preset, which this repository uses, ignores `feat!:`.
-- **`Reflect.construct`:** the rule reports fewer functions, a bug fix released as a patch.
-- **`no-function-hoisting` block declarations:** the rule reports the same declarations, but `eslint --fix` no longer clears those in blocks and `switch` cases. Like the constructor-name suggestion, this is a minor change under ESLint's policy. It ships in 2.0 with the other changes, so its `fix:` commit type does not change the release version.
-- **The docs corrections:** documentation only, with no release of their own.
-
-Releases publish only from `master` and `beta` (`.github/workflows/release.yml`). Changes merged to `develop` collect there, so all of these ship together as 2.0.0 when `develop` is merged into `master`.
+- **Removed options, with the `objectMethods` default `false`:** `feat:` with a `BREAKING CHANGE:` footer. semantic-release's default Angular preset, which this repository uses, ignores `feat!:`. Users who want the old object method behavior set `objectMethods: true`.
+- **Suggestion instead of fix for constructor-named functions:** `feat:`. The rule reports the same functions, but `eslint --fix` no longer clears those reports. The old fix makes `new` throw `TypeError`, so keeping it is not an option.
+- **`no-function-hoisting` block declarations:** `fix:`. The rule reports the same declarations, but `eslint --fix` no longer clears those in blocks and `switch` cases.
+- **`Reflect.construct` and `prefer-arrow-functions` block declarations:** `fix:`. The rule reports fewer functions.
+- **The docs corrections:** `docs:`, with no release of their own.
 
 ## Implementation
 
@@ -262,7 +167,7 @@ Each change has its own PR:
 2. Keep a function passed to `Reflect.construct` in the same file, directly or through an alias. The rule follows `new` but not this built-in, so the file shows the need and the current fix breaks it.
 3. Add `meta.hasSuggestions` and the suggestion tier for functions with a constructor name that are used other than by direct calls, with tests for each signal and for the JSX exception. This resolves #10.
 4. In `no-function-hoisting`, report a declaration directly in a block statement or `switch` case without a fix. Declarations directly in a function body, a class static block, or the top level keep their fix ([#28](https://github.com/privatenumber/eslint-plugin-arrow/pull/28)).
-5. In `prefer-arrow-functions`, skip every function declaration directly in a block statement or `switch` case, not only those in code the parser marks as not strict. Declarations directly in a function body, a class static block, or the top level are not affected. The rule reports fewer functions, a bug fix released as a patch.
+5. In `prefer-arrow-functions`, skip every function declaration directly in a block statement or `switch` case, not only those in code the parser marks as not strict. Declarations directly in a function body, a class static block, or the top level are not affected.
 
 Follow-up after 2.0: the typed-mode measurement in [Type information](#type-information).
 

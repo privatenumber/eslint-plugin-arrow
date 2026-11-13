@@ -732,13 +732,13 @@ function value() { return 'value' }`,
 		changes: changesInAll(true, { preferArrowFunctions: false }),
 	},
 	{
-		name: 'no-function-hoisting move inside block',
+		name: 'no-function-hoisting reports without a move inside block',
 		sourceType: 'module',
 		code: `{
 	log(inner());
 	function inner() { return 'inner' }
 }`,
-		changes: changesInAll(true, { preferArrowFunctions: false }),
+		changes: changesInAll(false),
 	},
 	{
 		name: 'no-function-hoisting typeof',

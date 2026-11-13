@@ -391,7 +391,6 @@ export const noFunctionHoisting = createRule<Options, 'noFunctionHoisting'>({
 			const statement = getStatement(node);
 			const groupStart = getOverloadGroupStart(statement, node.id.name);
 			const statements = getStatementList(statement.parent!);
-			const outerScope = sourceCode.getScope(node).upper!;
 
 			// Redeclarations (such as a `var` or a second implementation) cannot be moved safely,
 			// so only a function and its directly preceding overload signatures are moved
@@ -399,8 +398,8 @@ export const noFunctionHoisting = createRule<Options, 'noFunctionHoisting'>({
 			const isMovable = (
 				isFunctionVariable(functionVariable)
 				// Annex B may assign an outer binding at runtime; compiler settings can change strictness
-				&& outerScope.type !== 'block'
-				&& outerScope.type !== 'switch'
+				&& functionVariable.scope.type !== 'block'
+				&& functionVariable.scope.type !== 'switch'
 				&& statements !== undefined
 				&& statements.indexOf(statement) - statements.indexOf(groupStart) === signatureCount
 			);

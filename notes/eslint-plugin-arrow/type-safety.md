@@ -54,7 +54,6 @@ A JSDoc `@returns {never}` in JavaScript does not need a skip: the arrow functio
 - a variable statement whose first declarator has the function as its initializer. TypeScript attaches the statement's JSDoc to the first declarator only.
 - an assignment statement whose right side is the function, through any chain such as `a = b = function () {}`, or through the right operand of `||` or `??`, as in `o.f = o.f || function () {}`. TypeScript follows one such operand ([`getSourceOfDefaultedAssignment`](https://github.com/microsoft/TypeScript/blob/v6.0.3/src/compiler/utilities.ts)); without it, the conversion drops the `this` type from the `.d.ts` output without a diagnostic.
 - a class field whose value is the function. TypeScript's result depends on where the comment is ([observed](../typescript/jsdoc-this.md#observed)); the skip ignores placement.
-- a class method, under `classMethods`
 
 Object properties, object methods, and call arguments convert. TypeScript still reads the tag there, but converting them did not report TS2730.
 
@@ -74,7 +73,7 @@ Cost, measured on the [corpus](#corpus): 106 of 4,910 named function declaration
 
 ## #9: functions that only throw
 
-**Decision:** skip a function declaration, or a class method under `classMethods`, that has no return type annotation and no `return` statement, and whose body cannot complete normally. The check is syntactic:
+**Decision:** skip a function declaration that has no return type annotation and no `return` statement, and whose body cannot complete normally. The check is syntactic:
 
 - `throw` cannot complete.
 - A block, including the function body, cannot complete when any of its statements cannot, because the statements after it are unreachable. Loops, `switch`, and labeled statements always count as completing (see the limits below), so a `break` or `continue` inside them cannot change this.

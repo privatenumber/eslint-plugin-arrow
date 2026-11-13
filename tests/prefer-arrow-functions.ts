@@ -2,7 +2,6 @@ import {
 	describe, test, expect, onTestFail,
 } from 'manten';
 import { RuleTester } from '@typescript-eslint/rule-tester';
-import typescriptParser from '@typescript-eslint/parser';
 import { RuleTester as EslintRuleTester, Linter, type Rule } from 'eslint';
 import { preferArrowFunctions } from '../src/rules/prefer-arrow-functions.ts';
 
@@ -256,7 +255,7 @@ describe('prefer-arrow-functions', () => {
 				code: 'export default a\nfunction a(){}',
 			},
 
-			// Class methods are opt-in
+			// Class methods are kept
 			{
 				name: 'class / method / default',
 				code: '(class{ a(){} })',
@@ -264,22 +263,18 @@ describe('prefer-arrow-functions', () => {
 			{
 				name: 'class / method / overload',
 				code: '(class{ a(b: string): void; a(b: any){} })',
-				options: [{ classMethods: true }],
 			},
 			{
 				name: 'class / method / overload with string key',
 				code: '(class{ \'a\'(b: string): void; a(b: any){} })',
-				options: [{ classMethods: true }],
 			},
 			{
 				name: 'class / method / overload with computed string key',
 				code: '(class{ [\'a\'](b: string): void; a(b: any){} })',
-				options: [{ classMethods: true }],
 			},
 			{
 				name: 'class / method / static overload',
 				code: '(class{ static a(b: string): void; static a(b: any){} })',
-				options: [{ classMethods: true }],
 			},
 			{
 				name: 'ts / overloads in namespace',
@@ -296,12 +291,10 @@ describe('prefer-arrow-functions', () => {
 			{
 				name: 'class / method / decorator',
 				code: '(class{ @b a(){} })',
-				options: [{ classMethods: true }],
 			},
 			{
 				name: 'class / method / parameter decorator',
 				code: 'class A { a(@b c){} }',
-				options: [{ classMethods: true }],
 			},
 
 			// Constructors
@@ -374,7 +367,6 @@ describe('prefer-arrow-functions', () => {
 			{
 				name: 'ts / assertion method',
 				code: '(class{ a(b: unknown): asserts b {} })',
-				options: [{ classMethods: true }],
 			},
 			{
 				name: 'ts / never return type',
@@ -558,47 +550,6 @@ describe('prefer-arrow-functions', () => {
 				}],
 				output: 'const a = () => {return class{static{this}}}',
 			},
-
-			// Function expression
-			{
-				name: 'expression / named',
-				options: [{ namedFunctionExpressions: true }],
-				code: '(function a() {})',
-				errors: [
-					{ messageId: 'preferArrowFunction' },
-				],
-				output: '(() => {})',
-			},
-			{
-				name: 'expression / named / comment',
-				options: [{ namedFunctionExpressions: true }],
-				code: '(function /*a*/ a() {})',
-				errors: [
-					{ messageId: 'preferArrowFunction' },
-				],
-				output: '(/*a*/ () => {})',
-			},
-			{
-				name: 'expression / named / line comment',
-				options: [{ namedFunctionExpressions: true }],
-				code: '(function\n//a\na() {})',
-				errors: [
-					{ messageId: 'preferArrowFunction' },
-				],
-				output: '(\n//a\n() => {})',
-			},
-			{
-				name: 'expression / named / async',
-				options: [{ namedFunctionExpressions: true }],
-
-				// The parser doesn't catch this but note the position of comment f
-				// JS doesn't allow multiline comments before the =>, but allows it after
-				code: '(async /*a*/ function /*b*/ a /*c*/ (/*d*/\na\n/*e*/) /*f*/ {\n})',
-				errors: [{
-					messageId: 'preferArrowFunction',
-				}],
-				output: '(async /*a*/ /*b*/ /*c*/ (/*d*/\na\n/*e*/) => /*f*/ {\n})',
-			},
 			{
 				name: 'expression / anonymous / async',
 				code: '(async /*a*/ function /*b*/  /*c*/ (/*d*/\na\n/*e*/) /*f*/ {\n})',
@@ -727,6 +678,7 @@ describe('prefer-arrow-functions', () => {
 			},
 			{
 				name: 'object property / method',
+				options: [{ objectMethods: true }] as [{ objectMethods: boolean }],
 				code: '({ /*a*/a/*b*/(b)/*c*/{} })',
 				errors: [{
 					messageId: 'preferArrowFunction',
@@ -735,6 +687,7 @@ describe('prefer-arrow-functions', () => {
 			},
 			{
 				name: 'object property / async method',
+				options: [{ objectMethods: true }] as [{ objectMethods: boolean }],
 				code: '({ async/*a*/a/*b*/(b)/*c*/{} })',
 				errors: [{
 					messageId: 'preferArrowFunction',
@@ -743,6 +696,7 @@ describe('prefer-arrow-functions', () => {
 			},
 			{
 				name: 'object property / async method / removes space',
+				options: [{ objectMethods: true }] as [{ objectMethods: boolean }],
 				code: '({ async /*a*/a/*b*/(b)/*c*/{} })',
 				errors: [{
 					messageId: 'preferArrowFunction',
@@ -751,58 +705,12 @@ describe('prefer-arrow-functions', () => {
 			},
 			{
 				name: 'object property / computed method',
+				options: [{ objectMethods: true }] as [{ objectMethods: boolean }],
 				code: '({ /*a*/["a"]/*b*/(b)/*c*/{} })',
 				errors: [{
 					messageId: 'preferArrowFunction',
 				}],
 				output: '({ /*a*/["a"]/*b*/: (b) => /*c*/{} })',
-			},
-
-			// Class
-			{
-				name: 'class / method',
-				code: '(class{ _/*a*/()/*b*/{} })',
-				errors: [{
-					messageId: 'preferArrowFunction',
-				}],
-				output: '(class{ _/*a*/ = () => /*b*/{} })',
-				options: [{ classMethods: true }],
-			},
-			{
-				name: 'class / async method',
-				code: '(class{ async/*a*/_/*b*/()/*c*/{} })',
-				errors: [{
-					messageId: 'preferArrowFunction',
-				}],
-				output: '(class{ /*a*/_/*b*/ = async () => /*c*/{} })',
-				options: [{ classMethods: true }],
-			},
-			{
-				name: 'class / private method',
-				code: '(class{ #_/*a*/()/*b*/{} })',
-				errors: [{
-					messageId: 'preferArrowFunction',
-				}],
-				output: '(class{ #_/*a*/ = () => /*b*/{} })',
-				options: [{ classMethods: true }],
-			},
-			{
-				name: 'class / static method',
-				code: '(class{ static/*a*/_/*b*/()/*c*/{} })',
-				errors: [{
-					messageId: 'preferArrowFunction',
-				}],
-				output: '(class{ static/*a*/_/*b*/ = () => /*c*/{} })',
-				options: [{ classMethods: true }],
-			},
-			{
-				name: 'class / instance method not overloaded by static signature',
-				code: '(class{ static a(b: string): void; static a(b: any){}; a(){} })',
-				errors: [{
-					messageId: 'preferArrowFunction',
-				}],
-				output: '(class{ static a(b: string): void; static a(b: any){}; a = () => {} })',
-				options: [{ classMethods: true }],
 			},
 
 			// Exports
@@ -1010,15 +918,6 @@ describe('prefer-arrow-functions', () => {
 				output: 'const foo = async/*a*//*b*//*c*/<b extends string>/*d*/(a:b)/*e*/:/*f*/void => /*\ng*/{}',
 			},
 			{
-				name: 'ts / expression / named',
-				options: [{ namedFunctionExpressions: true }],
-				code: '(async/*a*/function/*b*/foo/*c*/<b extends string>/*d*/(a:b)/*e*/:/*f*/void/*\ng*/{})',
-				errors: [{
-					messageId: 'preferArrowFunction',
-				}],
-				output: '(async/*a*//*b*//*c*/<b extends string>/*d*/(a:b)/*e*/:/*f*/void => /*\ng*/{})',
-			},
-			{
 				name: 'expression / uses its parameter',
 				code: 'a(function(b){ return b })',
 				errors: [{
@@ -1027,39 +926,13 @@ describe('prefer-arrow-functions', () => {
 				output: 'a((b) => { return b })',
 			},
 			{
-				name: 'expression / named / uses its parameter',
-				options: [{ namedFunctionExpressions: true }],
-				code: 'a(function c(b){ return b })',
-				errors: [{
-					messageId: 'preferArrowFunction',
-				}],
-				output: 'a((b) => { return b })',
-			},
-			{
 				name: 'object property / method / uses its parameter',
+				options: [{ objectMethods: true }] as [{ objectMethods: boolean }],
 				code: '({ a(b){ return b } })',
 				errors: [{
 					messageId: 'preferArrowFunction',
 				}],
 				output: '({ a: (b) => { return b } })',
-			},
-			{
-				name: 'class / method / uses its parameter',
-				code: '(class{ a(b){ return b } })',
-				options: [{ classMethods: true }],
-				errors: [{
-					messageId: 'preferArrowFunction',
-				}],
-				output: '(class{ a = (b) => { return b } })',
-			},
-			{
-				name: 'class / method / type predicate is converted',
-				code: '(class{ a(b: unknown): b is string { return true } })',
-				options: [{ classMethods: true }],
-				errors: [{
-					messageId: 'preferArrowFunction',
-				}],
-				output: '(class{ a = (b: unknown): b is string => { return true } })',
 			},
 			{
 				name: 'ts / type predicate (non-asserting) is converted',
@@ -1210,90 +1083,39 @@ describe('prefer-arrow-functions', () => {
 		ruleTester.run('prefer-arrow-functions', preferArrowFunctions, {
 			valid: [
 				{
-					name: 'objectMethods: false',
-					code: '({ a(b){ return b } })',
-					options: [{ objectMethods: false }],
+					name: 'object methods default to off',
+					code: '({ a(){} })',
 				},
 				{
-					name: 'namedFunctionExpressions: false',
+					name: 'named expression keeps distinct name',
 					code: 'a(function b(){})',
-					options: [{ namedFunctionExpressions: false }],
 				},
 				{
-					name: 'allowedNames / declaration',
-					code: 'function a(){}',
-					options: [{ allowedNames: ['a'] }],
-				},
-				{
-					name: 'allowedNames / variable',
-					code: 'const a = function(){}',
-					options: [{ allowedNames: ['a'] }],
-				},
-				{
-					name: 'allowedNames / object method',
-					code: '({ a(){} })',
-					options: [{ allowedNames: ['a'] }],
-				},
-				{
-					name: 'allowedNames / object property',
-					code: '({ "a": function(){} })',
-					options: [{ allowedNames: ['a'] }],
-				},
-				{
-					name: 'allowedNames / class method',
-					code: '(class{ ngOnInit(){} })',
-					options: [{
-						classMethods: true,
-						allowedNames: ['ngOnInit'],
-					}],
-				},
-				{
-					name: 'allowedNames / private class method',
-					code: '(class{ #a(){} })',
-					options: [{
-						classMethods: true,
-						allowedNames: ['#a'],
-					}],
+					name: 'class method stays a method',
+					code: '(class { a(){} })',
 				},
 			],
-			invalid: [
-				{
-					name: 'objectMethods: false still converts property values',
-					code: '({ a: function(){} })',
-					options: [{ objectMethods: false }],
-					errors: [{ messageId: 'preferArrowFunction' }],
-					output: '({ a: () => {} })',
-				},
-				{
-					name: 'namedFunctionExpressions: false still converts anonymous expressions',
-					code: 'a(function(){})',
-					options: [{ namedFunctionExpressions: false }],
-					errors: [{ messageId: 'preferArrowFunction' }],
-					output: 'a(() => {})',
-				},
-				{
-					name: 'namedFunctionExpressions: false still converts methods',
-					code: '({ a(){} })',
-					options: [{ namedFunctionExpressions: false }],
-					errors: [{ messageId: 'preferArrowFunction' }],
-					output: '({ a: () => {} })',
-				},
-				{
-					name: 'allowedNames only matches exact names',
-					code: 'function ab(){}',
-					options: [{ allowedNames: ['a'] }],
-					errors: [{ messageId: 'preferArrowFunction' }],
-					output: 'const ab = () => {}',
-				},
-				{
-					name: 'allowedNames does not match a computed key with the same text',
-					code: '({ [a](){} })',
-					options: [{ allowedNames: ['a'] }],
-					errors: [{ messageId: 'preferArrowFunction' }],
-					output: '({ [a]: () => {} })',
-				},
-			],
+			invalid: [{
+				name: 'object methods opt in',
+				code: '({ a(){} })',
+				options: [{ objectMethods: true }] as [{ objectMethods: boolean }],
+				errors: [{ messageId: 'preferArrowFunction' }],
+				output: '({ a: () => {} })',
+			}],
 		});
+		for (const [key, value] of Object.entries({
+			classMethods: true,
+			namedFunctionExpressions: true,
+			allowedNames: ['a'],
+		})) {
+			test(`rejects removed option ${key}`, () => {
+				const linter = new Linter();
+				expect(() => linter.verify('function a() {}', {
+					plugins: { arrow: { rules: { 'prefer-arrow-functions': preferArrowFunctions as unknown as Rule.RuleModule } } },
+					rules: { 'arrow/prefer-arrow-functions': ['error', { [key]: value }] },
+				})).toThrow();
+			});
+		}
 	});
 
 	describe('own type query', () => {
@@ -1392,7 +1214,6 @@ describe('prefer-arrow-functions', () => {
 				{
 					name: 'never alias / class method',
 					code: 'type N = never; class A { f(): N { throw e } }',
-					options: [{ classMethods: true }],
 				},
 			],
 			invalid: [
@@ -1486,7 +1307,6 @@ describe('prefer-arrow-functions', () => {
 				{
 					name: 'JSDoc this / class method',
 					code: 'class A { /** @this {A} */ f() {} }',
-					options: [{ classMethods: true }] as [{ classMethods: boolean }],
 				},
 				{
 					name: 'JSDoc this / class field',
@@ -1540,6 +1360,7 @@ describe('prefer-arrow-functions', () => {
 				},
 				{
 					name: 'JSDoc this / object method',
+					options: [{ objectMethods: true }] as [{ objectMethods: boolean }],
 					code: '({ /** @this {A} */ f() {} })',
 					output: '({ /** @this {A} */ f: () => {} })',
 					errors,
@@ -1573,249 +1394,6 @@ describe('prefer-arrow-functions', () => {
 			const eslintRuleTester = new EslintRuleTester();
 			eslintRuleTester.run('prefer-arrow-functions', preferArrowFunctions as unknown as Rule.RuleModule, cases);
 		});
-	});
-
-	describe('classMethods', () => {
-		const options = [{ classMethods: true }] as const;
-
-		ruleTester.run('prefer-arrow-functions', preferArrowFunctions, {
-			valid: [
-				// A field type that uses `this` can depend on itself. Found in colinhacks/zod
-				{
-					name: 'this type / return type',
-					code: '(class{ a(): Box<this> { return b } })',
-					options,
-				},
-				{
-					name: 'this type / parameter',
-					code: '(class{ a(b: this) {} })',
-					options,
-				},
-				{
-					name: 'this type / type parameter constraint',
-					code: '(class{ a<T extends this>(b: T) {} })',
-					options,
-				},
-				{
-					name: 'static method using this',
-					code: '(class{ static a(){ return this } })',
-					options,
-				},
-				{
-					name: 'name read through super elsewhere in the file',
-					code: 'class A { a(){} }\nclass B extends A { b(){ return super.a() } }',
-					options,
-				},
-				{
-					name: 'name read through super in a later class',
-					code: 'class A { a(){} }\nclass B extends A { a(){ return super.a() } }',
-					options,
-				},
-				{
-					name: 'name read through prototype',
-					code: 'class A { a(){} }\nA.prototype.a',
-					options,
-				},
-				{
-					name: 'name read through computed prototype access',
-					code: 'class A { a(){} }\nA["prototype"]["a"]',
-					options,
-				},
-				{
-					name: 'read by an earlier field initializer',
-					code: '(class{ b = this.a(); a(){} })',
-					options,
-				},
-				{
-					name: 'private method read by an earlier field initializer',
-					code: '(class{ b = this.#a(); #a(){} })',
-					options,
-				},
-				{
-					name: 'read by an earlier static block',
-					code: '(class{ static { this.a() } static a(){} })',
-					options,
-				},
-				{
-					name: 'override',
-					code: 'class B extends A { override a(){ return this } }',
-					options,
-				},
-				{
-					name: 'custom element callbacks',
-					code: 'class A extends HTMLElement { connectedCallback(){ this.a() } attributeChangedCallback(){} formResetCallback(){} }',
-					options,
-				},
-				{
-					name: 'lifecycle method in allowedNames',
-					code: 'class A extends Component { render(){ return this.props } }',
-					options: [{
-						classMethods: true,
-						allowedNames: ['render'],
-					}],
-				},
-			],
-			invalid: [
-				{
-					name: 'this type / only in the body',
-					code: '(class{ a() { const b: this = this } })',
-					options,
-					errors: [{ messageId: 'preferArrowFunction' }],
-					output: '(class{ a = () => { const b: this = this } })',
-				},
-				{
-					name: 'semicolons / class field',
-					code: 'class A {\n\tb = 1;\n\ta(){}\n}',
-					options,
-					errors: [{ messageId: 'preferArrowFunction' }],
-					output: 'class A {\n\tb = 1;\n\ta = () => {};\n}',
-				},
-				{
-					name: 'no semicolons / class field',
-					code: 'class A {\n\tb = 1\n\ta(){}\n}',
-					options,
-					errors: [{ messageId: 'preferArrowFunction' }],
-					output: 'class A {\n\tb = 1\n\ta = () => {}\n}',
-				},
-				{
-					name: 'method using this',
-					code: '(class{ a(){ return this.b } })',
-					options,
-					errors: [{ messageId: 'preferArrowFunction' }],
-					output: '(class{ a = () => { return this.b } })',
-				},
-				{
-					name: 'method using this in a nested arrow function',
-					code: '(class{ a(){ return () => this } })',
-					options,
-					errors: [{ messageId: 'preferArrowFunction' }],
-					output: '(class{ a = () => { return () => this } })',
-				},
-				{
-					name: 'member on the same line needs a semicolon',
-					code: '(class{ a(){} b(){} })',
-					options,
-					errors: [
-						{ messageId: 'preferArrowFunction' },
-						{ messageId: 'preferArrowFunction' },
-					],
-					output: '(class{ a = () => {}; b = () => {} })',
-				},
-				{
-					name: 'handler next to custom element callbacks',
-					code: 'class A extends HTMLElement {\nconnectedCallback(){ this.addEventListener("click", this.onClick) }\nonClick(){ this.a() }\n}',
-					options,
-					errors: [{ messageId: 'preferArrowFunction' }],
-					output: 'class A extends HTMLElement {\nconnectedCallback(){ this.addEventListener("click", this.onClick) }\nonClick = () => { this.a() }\n}',
-				},
-				{
-					name: 'private method using this',
-					code: '(class{ #a(){ return this } })',
-					options,
-					errors: [{ messageId: 'preferArrowFunction' }],
-					output: '(class{ #a = () => { return this } })',
-				},
-				{
-					name: 'read by a later field initializer',
-					code: '(class{ a(){} b = this.a() })',
-					options,
-					errors: [{ messageId: 'preferArrowFunction' }],
-					output: '(class{ a = () => {}; b = this.a() })',
-				},
-				{
-					name: 'read later by a function in an earlier field',
-					code: '(class{ b = () => this.a(); a(){} })',
-					options,
-					errors: [{ messageId: 'preferArrowFunction' }],
-					output: '(class{ b = () => this.a(); a = () => {} })',
-				},
-				{
-					name: 'super reads of other names do not block the method',
-					code: 'class B extends A { a(){} b(){ return super.c() } }',
-					options,
-					errors: [{ messageId: 'preferArrowFunction' }],
-					output: 'class B extends A { a = () => {}; b(){ return super.c() } }',
-				},
-				{
-					name: 'object method using this inside a converted method stays a method',
-					code: '(class{ a(){ return { b(){ return this } } } })',
-					options,
-					errors: [{ messageId: 'preferArrowFunction' }],
-					output: '(class{ a = () => { return { b(){ return this } } } })',
-				},
-			],
-		});
-	});
-
-	// Every option only keeps functions, so a combination keeps exactly what each option keeps alone
-	test('options compose independently', () => {
-		const keepOptions = {
-			classMethods: false,
-			objectMethods: false,
-			namedFunctionExpressions: false,
-			allowedNames: ['kept'],
-		};
-		const convertAll = {
-			classMethods: true,
-			objectMethods: true,
-			namedFunctionExpressions: true,
-			allowedNames: [],
-		};
-		const code = [
-			'export function exported() {}',
-			'export default function () {}',
-			'function local() {}',
-			'function kept() {}',
-			'callback(function named() {});',
-			'callback(function () {});',
-			'export const value = function kept() {};',
-			'const object = { method() {}, property: function () {}, kept() {} };',
-			'class Example { method() { return this } kept() {} static helper() {} }',
-		].join('\n');
-
-		const linter = new Linter({ configType: 'flat' });
-		const lint = (options: Record<string, unknown>) => linter.verify(code, {
-			languageOptions: { parser: typescriptParser },
-			plugins: {
-				arrow: {
-					rules: {
-						'prefer-arrow-functions': preferArrowFunctions as unknown as Rule.RuleModule,
-					},
-				},
-			},
-			rules: { 'arrow/prefer-arrow-functions': ['error', options] },
-		}).map(({ line, column }) => `${line}:${column}`);
-
-		const allReports = lint(convertAll);
-		const keptBy = Object.fromEntries(
-			Object.entries(keepOptions).map(([name, value]) => {
-				const reports = new Set(lint({
-					...convertAll,
-					[name]: value,
-				}));
-				return [name, allReports.filter(report => !reports.has(report))];
-			}),
-		);
-
-		// Each option keeps at least one function in the sample
-		for (const kept of Object.values(keptBy)) {
-			expect(kept.length).toBeGreaterThan(0);
-		}
-
-		const names = Object.keys(keepOptions) as (keyof typeof keepOptions)[];
-		let combinations: (typeof names)[] = [[]];
-		for (const name of names) {
-			combinations = [...combinations, ...combinations.map(subset => [...subset, name])];
-		}
-		for (const selected of combinations) {
-			const options = Object.fromEntries(selected.map(name => [name, keepOptions[name]]));
-			const expectedKept = new Set(selected.flatMap(name => keptBy[name]));
-
-			expect(lint({
-				...convertAll,
-				...options,
-			})).toStrictEqual(allReports.filter(report => !expectedKept.has(report)));
-		}
 	});
 
 	describe('recursive returns', () => {
@@ -1909,7 +1487,6 @@ describe('prefer-arrow-functions', () => {
 
 	describe('non-completing functions', () => {
 		const errors = [{ messageId: 'preferArrowFunction' as const }];
-		const classOptions: [{ classMethods: boolean }] = [{ classMethods: true }];
 		const cases = {
 			valid: [
 				{
@@ -1963,7 +1540,6 @@ describe('prefer-arrow-functions', () => {
 				{
 					name: 'non-completing / method',
 					code: 'class C { f() { throw 1 } }',
-					options: classOptions,
 				},
 			],
 			invalid: [
@@ -2030,6 +1606,7 @@ describe('prefer-arrow-functions', () => {
 				},
 				{
 					name: 'non-completing / object method',
+					options: [{ objectMethods: true }] as [{ objectMethods: boolean }],
 					code: '({ f() { throw 1 } })',
 					output: '({ f: () => { throw 1 } })',
 					errors,
@@ -2067,7 +1644,6 @@ describe('prefer-arrow-functions', () => {
 				'function A(){}new A()',
 				{
 					code: '(class{ b = this.a(); a(){} })',
-					options: [{ classMethods: true }],
 				},
 			],
 			invalid: [
@@ -2075,18 +1651,6 @@ describe('prefer-arrow-functions', () => {
 					code: 'function a(){}\n(b)',
 					errors: [{ messageId: 'preferArrowFunction' }],
 					output: 'const a = () => {};\n(b)',
-				},
-				{
-					code: '(class{ a(b){} })',
-					options: [{ classMethods: true }],
-					errors: [{ messageId: 'preferArrowFunction' }],
-					output: '(class{ a = (b) => {} })',
-				},
-				{
-					code: '(class{ a(){ return this } })',
-					options: [{ classMethods: true }],
-					errors: [{ messageId: 'preferArrowFunction' }],
-					output: '(class{ a = () => { return this } })',
 				},
 			],
 		});
@@ -2379,6 +1943,7 @@ describe('prefer-arrow-functions', () => {
 			invalid: [
 				{
 					name: 'computed __proto__ method',
+					options: [{ objectMethods: true }] as [{ objectMethods: boolean }],
 					code: '({ [\'__proto__\'](){} })',
 					errors,
 					output: '({ [\'__proto__\']: () => {} })',
@@ -2471,7 +2036,6 @@ describe('prefer-arrow-functions', () => {
 				{
 					name: 'class method with eval before a later eval call',
 					code: "class A { a(){ return eval('1') } } eval('2')",
-					options: [{ classMethods: true }] as [{ classMethods: boolean }],
 				},
 			],
 			invalid: [

@@ -27,10 +27,7 @@ const configs: Record<ConfigName, Linter.Config> = {
 		},
 		rules: {
 			'arrow/prefer-arrow-functions': ['error', {
-				classMethods: true,
 				objectMethods: true,
-
-				// Not `namedFunctionExpressions`, which is documented to change names
 			}],
 			'arrow/no-function-hoisting': 'error',
 		},
@@ -640,7 +637,7 @@ log(compute());`,
 		changes: changesInAll(true),
 	},
 
-	// Changed: object and class methods
+	// Object methods change only when enabled; class methods remain unchanged
 	{
 		name: 'object method',
 		sourceType: 'module',
@@ -648,7 +645,7 @@ log(compute());`,
 	greet() { return 'hello' },
 };
 log(greeter.greet());`,
-		changes: changesInAll(true),
+		changes: changesInAll(false, { allOptions: true }),
 	},
 	{
 		name: 'object method named constructor',
@@ -657,7 +654,7 @@ log(greeter.greet());`,
 	constructor() { return 'constructed' },
 };
 log(object.constructor());`,
-		changes: changesInAll(true),
+		changes: changesInAll(false, { allOptions: true }),
 	},
 	{
 		name: 'object method using super',
@@ -668,7 +665,7 @@ const object = {
 	read() { return \`child \${super.read()}\` },
 };
 log(object.read());`,
-		changes: changesInAll(true),
+		changes: changesInAll(false, { allOptions: true }),
 	},
 	{
 		name: 'class method using this',
@@ -684,7 +681,7 @@ log(object.read());`,
 }
 const counter = new Counter();
 log(counter.increment(), counter.increment());`,
-		changes: changesInAll(false, { allOptions: true }),
+		changes: changesInAll(false),
 	},
 	{
 		name: 'class static method without this',
@@ -693,7 +690,7 @@ log(counter.increment(), counter.increment());`,
 	static read() { return 'static read' }
 }
 log(Example.read());`,
-		changes: changesInAll(false, { allOptions: true }),
+		changes: changesInAll(false),
 	},
 
 	// Changed: no-function-hoisting moves

@@ -1,6 +1,6 @@
 # `prefer-arrow-functions` options
 
-`prefer-arrow-functions` has four options. Three are booleans that each keep one syntactic kind of function, and one is a list of names to keep. Every option only keeps functions, so options compose without interacting. This note records why each option exists, why it has its name and default, what we tested, and what would justify a change.
+This note records the 1.x option research, including the original design, experiments, and reasons for each option. In 2.0 only `objectMethods` remains, and it defaults to `false`.
 
 Last verified: 2026-10-31, before the first release, with Node.js v26.13.0, ESLint 9.39.5, `@typescript-eslint/parser` 8.72.1, and TypeScript 6.0.3.
 
@@ -12,7 +12,7 @@ These are project decisions, derived from the goal in [CONTRIBUTING.md](../../CO
 2. **An option exists for one of two reasons.**
    - A *style option* lets users keep a conversion that preserves behavior but that they do not want. It defaults to converting.
    - A *behavior option* lets users accept a conversion that changes behavior in ways that the rule cannot check. It defaults to not converting, and its docs list every change.
-3. **Every option only keeps functions.** No option converts a function that another option keeps, and no option reads another option's value. So a combination keeps exactly the union of what each option keeps alone. The test `options compose independently` in [tests/prefer-arrow-functions.ts](../../tests/prefer-arrow-functions.ts) checks all 16 combinations on one sample.
+3. **Every option only keeps functions.** No option converts a function that another option keeps, and no option reads another option's value. So a combination keeps exactly the union of what each option keeps alone. The former `options compose independently` test checked all 16 combinations on one sample.
 4. **A boolean is named after the syntax that it converts, and `true` means "convert it".** When a plain name is ambiguous, the name uses the ESTree node term, such as `FunctionExpression` or `FunctionDeclaration`.
 
 | Option | Kind | Default | Keeps |
@@ -22,7 +22,12 @@ These are project decisions, derived from the goal in [CONTRIBUTING.md](../../CO
 | `namedFunctionExpressions` | Changes `.name`, opt-in | `false` | Function expressions whose own name differs from the name the arrow function would get |
 | `allowedNames` | Escape hatch | `[]` | Functions with a listed name |
 
+
+**Historical research:** The table and sections below describe 1.x. In 2.0 only `objectMethods` remains, and it defaults to `false` because conversion can change TypeScript parameter checking and source text. See [fix policy](./fix-policy.md).
+
 ## `classMethods`
+
+**Removed in 2.0.** Class fields are own enumerable properties and can change binding and prototype behavior. See [fix policy](./fix-policy.md). The research below describes 1.x.
 
 **What it converts:** `m() {}` in a class becomes the field `m = () => {}`.
 
@@ -103,6 +108,8 @@ new arrow: TypeError
 
 ## `namedFunctionExpressions`
 
+**Removed in 2.0.** Removing a distinct function name changes observable names and stack traces. See [fix policy](./fix-policy.md). The research below describes 1.x.
+
 **What it converts:** `callback(function onTick() {})` becomes `callback(() => {})`.
 
 **Kind: style, with a trade-off.** The conversion removes the name, which changes `.name`:
@@ -148,6 +155,8 @@ An arrow function gets a name from where it is defined: a variable, an assignmen
 **What would justify adding it again:** users ask for the `export function` style together with this rule, and a config override per file does not work for them. A cycle-safety option would be a different design: it would need to keep every module-level declaration, not only exported ones, and it needs a report of a real cycle broken by this rule first.
 
 ## `allowedNames`
+
+**Removed in 2.0.** Name-wide exclusions suppress unrelated functions and can become stale without notice. See [fix policy](./fix-policy.md). The research below describes 1.x.
 
 **What it keeps:** functions whose own name, assigned variable or property name, or method name is in the list. Private methods include the `#`. Names match exactly.
 

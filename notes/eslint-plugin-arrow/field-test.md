@@ -72,9 +72,9 @@ Each fix has rule tests and, for behavior changes, a fixture in [tests/runtime-b
 | A later reference runs early through a hoisted function | async | 42 test failures, `Cannot access 'taskComplete' before initialization` | [runtime-safety.md](./runtime-safety.md#uses-that-run-early-through-a-hoisted-function) |
 | `.name`, `.length`, `.prototype` read on the expression | mocha | 4 tests switched to skipped | [runtime-safety.md](./runtime-safety.md#function-properties-read-on-the-expression) |
 | `.toString()` read on the expression, and functions nested in it | acorn | 4 test failures: acorn parsed the stringified test source with `ecmaVersion: 5` | Same section. The second run found the nested case |
-| A named callback lost its name | mocha | A stack trace showed `at eval` instead of `at throwError` | `namedFunctionExpressions` defaults to `false` ([prefer-arrow-functions-options.md](./prefer-arrow-functions-options.md#namedfunctionexpressions)) |
+| A named callback lost its name | mocha | A stack trace showed `at eval` instead of `at throwError` | 2.0 keeps expressions whose name would change ([prefer-arrow-functions-options.md](./prefer-arrow-functions-options.md#namedfunctionexpressions)) |
 | Parameters counted as sibling functions | zod | Circular fixes: `ESLintCircularFixesWarning`, never converged | `isFunctionVariable` checks the definition type |
-| `this` type in a method signature | zod, `classMethods` | TS7022, build failure | Methods with a `this` type stay methods ([../typescript/class-fields.md](../typescript/class-fields.md#a-this-type-can-make-the-fields-type-circular)) |
+| `this` type in a method signature | zod, `classMethods` | TS7022, build failure | 2.0 keeps all class methods ([../typescript/class-fields.md](../typescript/class-fields.md#a-this-type-can-make-the-fields-type-circular)) |
 | No semicolon after new statements | commander, marked, ky, zod, defu, ufo, zustand, immer | Format and style checks failed | New statements follow the file's semicolon style |
 | JSDoc left behind by a move | express, debug, commander | Docs above the wrong code, for example `View`'s docs 50 lines below it | JSDoc moves across a blank line |
 | Blank lines around moves | mocha, debug, zustand, zod, commander | Runs of 3 to 8 blank lines, a trailing blank line, functions glued to the next JSDoc | Blank lines move with the code |

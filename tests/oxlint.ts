@@ -112,10 +112,10 @@ describe('oxlint', () => {
 				extends: ['./node_modules/eslint-plugin-arrow/oxlint.json'],
 				rules: {
 					'arrow/no-function-hoisting': ['error', { allowInFunctionBodies: true }],
-					'arrow/prefer-arrow-functions': ['error', { allowedNames: ['load'] }],
+					'arrow/prefer-arrow-functions': ['error', { objectMethods: false }],
 				},
 			}),
-			'file.ts': source,
+			'file.ts': 'export const object = { load() {} };',
 		});
 
 		expect(await lint(fixture.path)).toStrictEqual([]);

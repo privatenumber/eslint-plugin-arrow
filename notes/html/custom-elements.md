@@ -1,6 +1,6 @@
 # Custom element lifecycle callbacks
 
-The browser reads custom element lifecycle callbacks from the class prototype once, when `customElements.define()` runs. A callback written as an arrow function class field is an own property of each instance, so the browser never calls it. `prefer-arrow-functions` therefore keeps these methods even with `classMethods: true`.
+The browser reads custom element lifecycle callbacks from the class prototype once, when `customElements.define()` runs. A callback written as an arrow function class field is an own property of each instance, so the browser never calls it. `prefer-arrow-functions` 2.0 keeps all class methods. Version 1.x also kept these callbacks when `classMethods: true`.
 
 Last verified: 2026-10-31, against the [HTML Living Standard](https://html.spec.whatwg.org/multipage/custom-elements.html#dom-customelementregistry-define) (accessed 2026-10-31) and headless Chrome 156.
 

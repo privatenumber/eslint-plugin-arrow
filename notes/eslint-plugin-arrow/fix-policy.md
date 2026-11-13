@@ -131,7 +131,7 @@ The option converted class methods to arrow class fields. A public instance fiel
 | Async | The suite failed before any test ran. Its Babel 6 parser rejects class fields, starting with `removeLink` in `lib/internal/DoublyLinkedList.js:11`. Without `lib/`, no other failure appeared. |
 | Axios | `AxiosHeaders#set` (`lib/core/AxiosHeaders.js:216`) became an own property, which `clear()` deletes. 41 of 93 tests in the headers suite failed. The full suite stalled, so the total is not known. |
 
-Framework lifecycle methods are a separate break. Angular, Vue class components, and custom elements read lifecycle hooks from the prototype, so a hook converted to a field is never called. Angular Components had 401 lifecycle-named methods in the scan, all in decorated classes. ESLint core `prefer-arrow-callback` and Biome `useArrowFunction` do not convert methods ([prior-art.md](./prior-art.md)). typescript-eslint keeps a fix that changes behavior behind an option named for the risk, `allowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing` in [`prefer-optional-chain`](https://typescript-eslint.io/rules/prefer-optional-chain/), and offers suggestions otherwise. No safe subset of class methods was found, and a suggestion for each of thousands of methods would not be useful, so the option was removed rather than downgraded.
+Framework lifecycle methods are a separate break. Angular, Vue class components, and custom elements read lifecycle hooks from the prototype, so a hook converted to a field is never called. The rule kept custom element callbacks with a static name, such as `connectedCallback`, but not other frameworks' hooks or a callback with a computed key. Angular Components had 401 lifecycle-named methods in the scan, all in decorated classes. ESLint core `prefer-arrow-callback` and Biome `useArrowFunction` do not convert methods ([prior-art.md](./prior-art.md)). typescript-eslint keeps a fix that changes behavior behind an option named for the risk, `allowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing` in [`prefer-optional-chain`](https://typescript-eslint.io/rules/prefer-optional-chain/), and offers suggestions otherwise. No safe subset of class methods was found, and a suggestion for each of thousands of methods would not be useful, so the option was removed rather than downgraded.
 
 #### `namedFunctionExpressions`
 
@@ -145,7 +145,7 @@ The option listed exact names that the rule never converts. The rule docs recomm
 - **It is broad.** A name matches every function with that name in the files the config object selects, which is every file unless the user scopes the option with `files`. In Async, listing the two `autoInject` methods that broke (`a` and `task5`) also kept 7 unrelated functions.
 - **It does not fix whole classes of breakage.** With `classMethods`, listing `removeLink` only moved the Async parse error to the next method, `empty`.
 
-Stale entries are never reported, so the list only grows. The lifecycle use goes away with `classMethods`. The cross-file use remains, and removing the option loses one capability: a single entry that keeps every function with a name, such as a lowercase `factory` that consumers construct, across many modules. The docs now point to an `eslint-disable-next-line` comment for each function, which is local and which ESLint reports when stale with `reportUnusedDisableDirectives`, and to a config object with `files` that turns the rule off for some files. ESLint does not report a stale `files` override. A codebase with many such functions needs more comments than one list entry, which also makes each exception visible where it applies.
+Stale entries are never reported, so the list only grows. The lifecycle use goes away with `classMethods`. The cross-file use remains, and removing the option loses one capability: a single entry that keeps every function with a name, such as a lowercase `factory` that consumers construct, across many modules. The docs now point to an `eslint-disable-next-line` comment for each function, which is local and which ESLint reports when stale with `reportUnusedDisableDirectives`, and to a config object with `files` that turns the rule off for some files. ESLint does not report a stale `files` override. A disable comment has one more limit: ESLint can remove it as unused before `no-function-hoisting` moves the function and `prefer-arrow-functions` reports it, so the rule docs say to move the declaration above its uses before adding the comment, and list the `files` override first. A codebase with many such functions needs more comments than one list entry, which also makes each exception visible where it applies.
 
 GitHub code search found no external config that uses any of the three options. Indexed files are not a full count of users, but `eslint-plugin-arrow@1.0.0` was published on 2026-11-04, so few configs can depend on them.
 
@@ -235,7 +235,7 @@ A list such as `vi.fn` and `mockImplementation` was proposed for #10. Rejected b
 
 ### Rejected: an `allowedCallees` option
 
-Rejected for the same reason: each user would have to find every constructing callee, and the option does not scale. It would also repeat the problems of `allowedNames`, which 2.0 removes (see [Removed options](#allowednames)). A disable comment or a `files` override already keeps a function.
+Rejected for the same reason: each user would have to find every constructing callee, and the option does not scale. It would also repeat the problems of `allowedNames`, which 2.0 removes (see [Removed options](#allowednames)). A `files` override or a disable comment already keeps a function (see [`allowedNames`](#allowednames)).
 
 ### Rejected: skip PascalCase functions
 
@@ -261,8 +261,8 @@ Each change has its own PR:
 1. Remove `classMethods`, `namedFunctionExpressions`, and `allowedNames`, and the code that only they used. Change the `objectMethods` default to `false`. Update the rule docs with a section on migrating from 1.x, the README, CONTRIBUTING, and the options note.
 2. Keep a function passed to `Reflect.construct` in the same file, directly or through an alias. The rule follows `new` but not this built-in, so the file shows the need and the current fix breaks it.
 3. Add `meta.hasSuggestions` and the suggestion tier for functions with a constructor name that are used other than by direct calls, with tests for each signal and for the JSX exception. This resolves #10.
-4. In `no-function-hoisting`, report a declaration in a block or `switch` case without a fix ([#28](https://github.com/privatenumber/eslint-plugin-arrow/pull/28)).
-5. In `prefer-arrow-functions`, skip every function declaration in a block or `switch` case, not only those in code the parser marks as not strict. The rule reports fewer functions, a bug fix released as a patch.
+4. In `no-function-hoisting`, report a declaration directly in a block statement or `switch` case without a fix. Declarations directly in a function body, a class static block, or the top level keep their fix ([#28](https://github.com/privatenumber/eslint-plugin-arrow/pull/28)).
+5. In `prefer-arrow-functions`, skip every function declaration directly in a block statement or `switch` case, not only those in code the parser marks as not strict. Declarations directly in a function body, a class static block, or the top level are not affected. The rule reports fewer functions, a bug fix released as a patch.
 
 Follow-up after 2.0: the typed-mode measurement in [Type information](#type-information).
 

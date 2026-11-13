@@ -88,7 +88,7 @@ function typeHelper() {}
 
 - TypeScript overload signatures move together with their implementation, and moved functions are never inserted between another function's signatures and its implementation.
 - Other repeated declarations of the same name, such as a `var` or a merged `namespace`, are reported but not fixed.
-- Functions declared in a block or `switch` case are reported but not fixed. In code that is not strict, which can include TypeScript output, moving the declaration can change when its [outer binding](https://tc39.es/ecma262/#sec-block-level-function-declarations-web-legacy-compatibility-semantics) receives the function.
+- Functions declared directly in a block statement, such as an `if` body, or in a `switch` case are reported but not fixed. Functions declared directly in a function body or a class static block are still fixed. In code that is not strict, which can include TypeScript output, moving the declaration can change when its [outer binding](https://tc39.es/ecma262/#sec-block-level-function-declarations-web-legacy-compatibility-semantics) receives the function.
 - A declaration is only moved within its own statement list. If the first use is elsewhere, the error is reported without a fix.
 - A declaration below a `/* eslint-disable */` block directive leaves the directive in place, so the moved function is no longer covered by it. ESLint then reports the function's problems instead of hiding them. Moving the directive would hide problems in all the code between its new and old places.
 

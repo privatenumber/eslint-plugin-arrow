@@ -16,7 +16,7 @@ Each repository was cloned at its latest release tag. The plugin was installed f
 
 Failures that also happened on the baseline, or only under parallel load, were classified as flaky and excluded. Those logs were not kept.
 
-The harness scripts were not kept either. To repeat the run, use a config like this one, which applies the settings above. The globs are examples; match them to how each repository runs its files:
+The harness scripts were not kept either. To repeat the historical run, use the 1.x plugin at revision `2649417` and a config like this one, which applies the settings above. The globs are examples; match them to how each repository runs its files:
 
 <!-- eslint-skip -->
 ```js

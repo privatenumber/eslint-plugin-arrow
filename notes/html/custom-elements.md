@@ -14,7 +14,7 @@ For form-associated elements, the same steps read four more names from the proto
 
 > If formAssociated is true, then for each callbackName of « "formAssociatedCallback", "formResetCallback", "formDisabledCallback", "formStateRestoreCallback" »: Let callbackValue be ? Get(prototype, callbackName).
 
-The rule's list of names is `customElementCallbacks` in [src/rules/prefer-arrow-functions.ts](../../src/rules/prefer-arrow-functions.ts). Update it when the standard adds a callback.
+The rule keeps all class methods, without a callback-name list. See [src/rules/prefer-arrow-functions.ts](../../src/rules/prefer-arrow-functions.ts).
 
 ## Experiment
 

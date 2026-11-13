@@ -87,10 +87,12 @@ describe('prefer-arrow-functions', () => {
 			// Object getters & setters
 			{
 				name: 'object getter',
+				options: [{ objectMethods: true }],
 				code: '({get a(){}})',
 			},
 			{
 				name: 'object setter',
+				options: [{ objectMethods: true }],
 				code: '({set a(b){}})',
 			},
 
@@ -1904,10 +1906,12 @@ describe('prefer-arrow-functions', () => {
 			valid: [
 				{
 					name: '__proto__ method',
+					options: [{ objectMethods: true }] as [{ objectMethods: boolean }],
 					code: '({ __proto__(){} })',
 				},
 				{
 					name: '__proto__ string method',
+					options: [{ objectMethods: true }] as [{ objectMethods: boolean }],
 					code: '({ \'__proto__\'(){} })',
 				},
 				{

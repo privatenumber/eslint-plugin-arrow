@@ -239,7 +239,7 @@ Be careful when you swap a method for an arrow function:
 - **`__proto__` changes meaning.** `{ __proto__() {} }` defines a method, but `{ __proto__: fn }` sets the object's prototype.
 - **A class field isn't a method.** `m = () => {}` creates a new function on every instance, instead of one shared on the prototype. So `super.m()` can't reach it, and the browser never calls a custom element's `connectedCallback` if it's a field.
 
-`prefer-arrow-functions` avoids these. It keeps class methods and object methods by default. If you enable [`objectMethods: true`](./docs/rules/prefer-arrow-functions.md#objectmethods), it converts object methods that do not use `this`, `super`, or `arguments`. This can change TypeScript parameter checking and the result of `toString()`.
+`prefer-arrow-functions` avoids these. It keeps class methods and object methods by default. If you enable [`objectMethods: true`](./docs/rules/prefer-arrow-functions.md#objectmethods), it converts eligible object methods that do not use `this`, `super`, or `arguments`. This can change TypeScript parameter checking and the result of `toString()`.
 
 ### What changes when you switch
 

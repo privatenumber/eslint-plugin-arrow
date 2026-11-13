@@ -72,12 +72,11 @@ It allows a top-down layout. The cost is documented: helpers below their callers
 
 ### Deferred: `meta.defaultOptions`
 
-ESLint since v9.15.0 and Oxlint 1.90.0 both apply `meta.defaultOptions` ([../eslint/plugin-metadata.md](../eslint/plugin-metadata.md#metadefaultoptions)), which would let tools show the defaults. We kept the manual merge in `createRule`, because switching needs two more changes and gives only that display benefit:
+ESLint since v9.15.0 and Oxlint 1.90.0 both apply `meta.defaultOptions` ([../eslint/plugin-metadata.md](../eslint/plugin-metadata.md#metadefaultoptions)), which would let tools show the defaults. We kept the manual merge in `createRule`, because switching needs a peer range change and gives only that display benefit:
 
 - The peer range would need to become `eslint >=9.15`.
-- ESLint's merge is recursive, unlike the manual merge. We have not checked how it merges a user's `allowedNames` array with the default `[]`.
 
-A tool that users rely on and that reads `meta.defaultOptions` would justify the switch, after testing the array merge.
+A tool that users rely on and that reads `meta.defaultOptions` would justify reevaluating the switch.
 
 ## Test coverage
 

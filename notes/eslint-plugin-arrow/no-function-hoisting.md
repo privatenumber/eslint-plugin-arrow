@@ -6,7 +6,7 @@ Last verified: 2026-10-31, before the first release, with Node.js v26.13.0, ESLi
 
 ## The fix must not change how tools read the file
 
-Moving a function declaration earlier in its own scope never changes runtime behavior, because the function exists from the start of the scope. But the fix also moves text, and some comments only mean something at a position: a shebang must be the first line, TypeScript pragmas must be at the top, and block directives cover the code below them. Project decision: the fix must not change how the parser, type checker, or linter reads the file, not only how it runs.
+Moving a function declaration earlier in its own scope can change runtime behavior in non-strict blocks and `switch` cases: [Annex B](https://tc39.es/ecma262/#sec-block-level-function-declarations-web-legacy-compatibility-semantics) assigns an outer binding when a plain function declaration is evaluated. TypeScript namespaces and enums do not make their code strict, even though typescript-eslint marks their scopes strict. The rule reports these declarations without fixing them, including async functions and generators that downlevel compilation can turn into plain functions. The fix also moves text, and some comments only mean something at a position: a shebang must be the first line, TypeScript pragmas must be at the top, and block directives cover the code below them. Project decision: the fix must not change how the parser, type checker, or linter reads the file, not only how it runs.
 
 ## File directives
 

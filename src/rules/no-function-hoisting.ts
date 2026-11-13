@@ -1,5 +1,6 @@
 import type { TSESTree, TSESLint } from '@typescript-eslint/utils';
 import { createRule } from '../utils/create-rule.ts';
+import { isStrictCode } from '../utils/is-strict-code.ts';
 import { isTypeOnlyReference } from '../utils/is-type-only-reference.ts';
 
 type SourceCode = Readonly<TSESLint.SourceCode>;
@@ -398,8 +399,9 @@ export const noFunctionHoisting = createRule<Options, 'noFunctionHoisting'>({
 			const signatureCount = functionVariable.defs.length - 1;
 			const isMovable = (
 				isFunctionVariable(functionVariable)
-				// Annex B assigns the outer binding when a sloppy block function is evaluated
-				&& !((outerScope.type === 'block' || outerScope.type === 'switch') && !outerScope.isStrict)
+				// Annex B assigns the outer binding for plain functions; downlevel compilation can
+				// turn async functions and generators into plain functions
+				&& !((outerScope.type === 'block' || outerScope.type === 'switch') && !isStrictCode(outerScope))
 				&& statements !== undefined
 				&& statements.indexOf(statement) - statements.indexOf(groupStart) === signatureCount
 			);

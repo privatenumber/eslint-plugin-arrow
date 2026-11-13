@@ -70,6 +70,33 @@ describe('no-function-hoisting', () => {
 
 		invalid: [
 			{
+				name: 'sloppy namespace block is reported without a fix',
+				code: "var a = 'outer'; namespace N { const peek = () => typeof a; { peek(); a(); peek(); function a() {} } }",
+				languageOptions: { parserOptions: { sourceType: 'script' } },
+				errors: [error('a')],
+				output: null,
+			},
+			{
+				name: 'sloppy enum initializer is reported without a fix',
+				code: 'enum E { X = (() => { { a(); function a() {} } return 1 })() }',
+				languageOptions: { parserOptions: { sourceType: 'script' } },
+				errors: [error('a')],
+				output: null,
+			},
+			{
+				name: 'module namespace block is fixed',
+				code: 'namespace N { { a(); function a() {} } }',
+				errors: [error('a')],
+				output: 'namespace N { { function a() {}a();  } }',
+			},
+			{
+				name: 'strict function namespace block is fixed',
+				code: 'function b() { "other"; "use strict"; namespace N { { a(); function a() {} } } }',
+				languageOptions: { parserOptions: { sourceType: 'script' } },
+				errors: [error('a')],
+				output: 'function b() { "other"; "use strict"; namespace N { { function a() {}a();  } } }',
+			},
+			{
 				name: 'same line',
 				code: 'a();function a(){}',
 				errors: [error('a')],

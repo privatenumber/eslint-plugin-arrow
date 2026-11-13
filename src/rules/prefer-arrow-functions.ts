@@ -415,9 +415,9 @@ const getUseSite = (node: TSESTree.Node, cache: WeakMap<TSESTree.Node, UseSite>)
 	return site!;
 };
 
-// `m`, `'m'`, and `['m']` all name the same method
+// `m`, `'m'`, and `['m']` all name the same property
 const getKeyName = (
-	member: TSESTree.MethodDefinition | TSESTree.Property | TSESTree.PropertyDefinition,
+	member: TSESTree.Property | TSESTree.PropertyDefinition,
 	sourceCode: Readonly<TSESLint.SourceCode>,
 ) => {
 	const { key } = member;
@@ -443,7 +443,6 @@ const getInferredName = (
 ) => {
 	const { parent } = node;
 	switch (parent.type) {
-		case 'MethodDefinition':
 		case 'Property':
 		case 'PropertyDefinition': {
 			// A computed key such as `[name]` gives `[name]`, which never matches a function name
@@ -1022,16 +1021,15 @@ export const preferArrowFunctions = createRule<Options, MessageIds>({
 
 			const { parent } = node;
 			if (parent.type === 'Property') {
-				// Object/Class getters, setters, and constructors cannot be arrow functions
-				if (['set', 'get', 'constructor'].includes(parent.kind)) {
+				// Object getters and setters cannot be arrow functions
+				if (parent.kind !== 'init') {
 					return false;
 				}
 
 				// `{ __proto__() {} }` defines a method, but `{ __proto__: value }` sets the prototype.
 				// Computed `['__proto__']` keys always define own properties
 				if (
-					parent.type === 'Property'
-					&& !parent.computed
+					!parent.computed
 					&& (
 						(parent.key.type === 'Identifier' && parent.key.name === '__proto__')
 						|| (parent.key.type === 'Literal' && parent.key.value === '__proto__')

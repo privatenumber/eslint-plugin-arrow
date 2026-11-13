@@ -1,6 +1,6 @@
 # TypeScript and arrow function class fields
 
-TypeScript accepts the class fields that `classMethods: true` produces, and it reports two of the runtime hazards in [../ecmascript/class-fields.md](../ecmascript/class-fields.md), including one that crosses files. JavaScript projects get neither error.
+TypeScript accepts the class fields that the 1.x `classMethods: true` option produced, and it reports two of the runtime hazards in [../ecmascript/class-fields.md](../ecmascript/class-fields.md), including one that crosses files. JavaScript projects get neither error.
 
 Last verified: 2026-10-31, TypeScript 6.0.3.
 
@@ -64,7 +64,7 @@ class B extends A { m = (x: string) => {} }
 // error TS2416: Property 'm' in type 'B' is not assignable to the same property in base type 'A'.
 ```
 
-zod and marked failed type checks this way with `classMethods: true`. The rule cannot see it without type information, so the option's docs list it as a reason to keep the option disabled.
+zod and marked failed type checks this way with `classMethods: true`. The rule cannot see it without type information, and the option was removed in 2.0.
 
 ### A `this` type can make the field's type circular
 
@@ -83,4 +83,4 @@ export class Nullable<T extends Base> extends Base<{ t: T }> {}
 // and is referenced directly or indirectly in its own initializer.
 ```
 
-Without the constraint, the same `this` types compile. `self = (): this => null as any`, `wrap = (): Box<this> => null as any`, and `nullish = () => this.nullable()` with an unconstrained `Box<T>` were all clean. So the error needs the constraint, which the rule cannot evaluate. `prefer-arrow-functions` skips every method with a `this` type in its signature instead: a skip never breaks code, and it only affects code that opted in to `classMethods`. Tests: `this type / ...` in [tests/prefer-arrow-functions.ts](../../tests/prefer-arrow-functions.ts).
+Without the constraint, the same `this` types compile. `self = (): this => null as any`, `wrap = (): Box<this> => null as any`, and `nullish = () => this.nullable()` with an unconstrained `Box<T>` were all clean. So the error needs the constraint, which the rule cannot evaluate. Version 1.x skipped methods with a `this` type in their signature; 2.0 keeps all class methods.

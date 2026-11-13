@@ -1,6 +1,6 @@
 # Custom element lifecycle callbacks
 
-The browser reads custom element lifecycle callbacks from the class prototype once, when `customElements.define()` runs. A callback written as an arrow function class field is an own property of each instance, so the browser never calls it. `prefer-arrow-functions` therefore keeps these methods even with `classMethods: true`.
+The browser reads custom element lifecycle callbacks from the class prototype once, when `customElements.define()` runs. A callback written as an arrow function class field is an own property of each instance, so the browser never calls it. `prefer-arrow-functions` 2.0 keeps all class methods. Version 1.x also kept these callbacks when `classMethods: true`.
 
 Last verified: 2026-10-31, against the [HTML Living Standard](https://html.spec.whatwg.org/multipage/custom-elements.html#dom-customelementregistry-define) (accessed 2026-10-31) and headless Chrome 156.
 
@@ -14,7 +14,7 @@ For form-associated elements, the same steps read four more names from the proto
 
 > If formAssociated is true, then for each callbackName of « "formAssociatedCallback", "formResetCallback", "formDisabledCallback", "formStateRestoreCallback" »: Let callbackValue be ? Get(prototype, callbackName).
 
-The rule's list of names is `customElementCallbacks` in [src/rules/prefer-arrow-functions.ts](../../src/rules/prefer-arrow-functions.ts). Update it when the standard adds a callback.
+The rule keeps all class methods, without a callback-name list. See [src/rules/prefer-arrow-functions.ts](../../src/rules/prefer-arrow-functions.ts).
 
 ## Experiment
 

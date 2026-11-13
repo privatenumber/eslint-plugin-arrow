@@ -1,6 +1,6 @@
 # Function properties
 
-Reading a property on a function gives the same result for every form that `prefer-arrow-functions` produces, except for `prototype`, `toString()`, and, for a sloppy-mode `function` only, `caller` and `arguments`. `length` does not differ. `name` does not differ for the forms below, where the name comes from a binding. With `namedFunctionExpressions: true`, the rule also converts a named function expression that has no binding, such as `g(function inner() {})`, and its `name` changes from `'inner'` to `''`.
+Reading a property on a function gives the same result for every form that `prefer-arrow-functions` produces, except for `prototype`, `toString()`, and, for a sloppy-mode `function` only, `caller` and `arguments`. `length` does not differ. `name` does not differ for the forms below, where the name comes from a binding. In 1.x, `namedFunctionExpressions: true` also converted a named function expression that has no binding, such as `g(function inner() {})`, and its `name` changes from `'inner'` to `''`.
 
 Last verified: 2026-11-11, Node.js v26.13.0 (V8) and Bun 1.4.2 (JavaScriptCore).
 

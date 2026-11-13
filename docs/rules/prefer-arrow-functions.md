@@ -74,24 +74,6 @@ const baz = /* a *//* b */() => /* c */ {}
 (async () => {})
 ```
 
-### Object methods
-
-<!-- eslint-disable pvtnbr/prefer-arrow-functions -->
-```ts
-// ❌
-const object = {
-    method() {}
-}
-```
-<!-- eslint-enable pvtnbr/prefer-arrow-functions -->
-
-```ts
-// ✅
-const object = {
-    method: () => {}
-}
-```
-
 ### Exports
 
 <!-- eslint-disable pvtnbr/prefer-arrow-functions -->
@@ -205,7 +187,7 @@ export default () => {}
     set foo(value) {}
 })
 
-// ✅ Class methods, unless `classMethods: true`, and class members that cannot be fields
+// ✅ Class methods
 class myClass extends Base {
     constructor() {}
 
@@ -264,7 +246,7 @@ This rule will not generate warnings or fixes for traditional functions that use
 
 ### Inside function body
 - Repeated parameter names, such as `function (a, a) {}`, which sloppy mode allows but arrow functions never do
-- [`this`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/this), except in instance methods with `classMethods` enabled
+- [`this`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/this)
 - [`arguments`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/arguments)
 - [`function*`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/function*)
 - [`new.target`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/new.target)
@@ -274,7 +256,7 @@ This rule will not generate warnings or fixes for traditional functions that use
 ### Function properties
 - [`name`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/name)
 - [`prototype`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/prototype)
-- [`caller`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/caller), which differs only for sloppy-mode functions. Keeping the function does not keep its callers: `f.caller.arguments` throws if the calling function was converted, so list callers whose properties are read in [`allowedNames`](#allowednames).
+- [`caller`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/caller), which differs only for sloppy-mode functions. Keeping the function does not keep its callers: `f.caller.arguments` throws if the calling function was converted, so use a [disable comment](#keeping-functions) for each caller whose properties are read.
 - [`arguments`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/arguments), which differs only for sloppy-mode functions
 - [`toString()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/toString), which returns the source text. Functions nested inside a function or class whose source is read are kept too.
 
@@ -296,16 +278,17 @@ These uses also count through simple aliases, such as `const alias = fn; new ali
 - [`get`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/get) / [`set`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/set)
 - [`constructor`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Classes/constructor)
 - An object method named `__proto__`, such as `{ __proto__() {} }`. As a property, `{ __proto__: value }` sets the object's [prototype](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Object_initializer#prototype_setter) instead of defining a method. A computed `['__proto__']` key is still converted.
-- Class methods, unless [`classMethods`](#classmethods) is enabled. That section lists the class methods that are never converted.
+- Class methods. Object shorthand methods are also kept unless [`objectMethods`](#objectmethods) is enabled.
+- Named function expressions whose name would change, such as `const a = function b() {}`. An arrow function would be named `a`, changing `.name` and stack traces.
 
 ### TypeScript
 - Function declarations without a return type annotation (a JSDoc `@returns` tag does not count) that directly return a call to themselves, including an awaited or optional call. Converting them can change the inferred return type to `any`. This also applies to JavaScript files that generate TypeScript declarations.
-- Function declarations and class methods without a return type annotation (a JSDoc `@returns` tag does not count) or a `return` statement whose body cannot complete normally, such as a body containing `throw` or an `if` with two throwing branches. Converting them can change the inferred return type from `void` to `never`, including in declarations generated from JavaScript.
+- Function declarations without a return type annotation (a JSDoc `@returns` tag does not count) or a `return` statement whose body cannot complete normally, such as a body containing `throw` or an `if` with two throwing branches. Converting them can change the inferred return type from `void` to `never`, including in declarations generated from JavaScript.
 - [`this` parameters](https://www.typescriptlang.org/docs/handbook/2/functions.html#declaring-this-in-a-function)
-- [Assertion functions](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-3-7.html#assertion-functions) (`asserts value`) and `never` return types. TypeScript only uses them to narrow types and detect unreachable code when the function is a declaration or a variable with an explicit function type, and a converted `const` has no type annotation. The return type counts when it is `never`, or a type alias in the same scope chain whose definition is `never` or another such alias. The rule doesn't evaluate types, so it misses other types that resolve to `never`, such as imported or namespace-qualified aliases, aliases declared in `declare global`, generic arguments (`Id<never>`), `keyof {}`, intersections, unions, and conditional or indexed access types. List those functions in [`allowedNames`](#allowednames).
+- [Assertion functions](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-3-7.html#assertion-functions) (`asserts value`) and `never` return types. TypeScript only uses them to narrow types and detect unreachable code when the function is a declaration or a variable with an explicit function type, and a converted `const` has no type annotation. The return type counts when it is `never`, or a type alias in the same scope chain whose definition is `never` or another such alias. The rule doesn't evaluate types, so it misses other types that resolve to `never`, such as imported or namespace-qualified aliases, aliases declared in `declare global`, generic arguments (`Id<never>`), `keyof {}`, intersections, unions, and conditional or indexed access types. Use a [disable comment](#keeping-functions), or a config object with `files` that turns the rule off for affected files.
 - Function declarations whose parameter, return, or type parameter types use `typeof value`, when `value` has no type annotation and its initializer uses the function. As a `const`, the function's type and the value's inferred type depend on each other, and TypeScript can report `TS7022`.
 - Function declarations whose signature reads their own type with `typeof`, directly or through same-file type aliases. As a `const`, the type depends on itself and TypeScript can report `TS7022`. Imported aliases, interfaces, and aliases or queries reached through a namespace, such as `N.T` or `typeof N.f`, are not followed, and neither are aliases declared in `declare global`.
-- Functions with a JSDoc `@this` tag on a declaration, the first declarator in a variable declaration, an assignment statement (including a default such as `o.f = o.f || function () {}`), a class method, or a class field. In checked JavaScript, TypeScript reads a tag on these hosts as a `this` parameter of the function, and reports `TS2730` when the function is an arrow function. Converting object properties, object methods, and call arguments does not report TS2730.
+- Functions with a JSDoc `@this` tag on a declaration, the first declarator in a variable declaration, an assignment statement (including a default such as `o.f = o.f || function () {}`), or a class field. In checked JavaScript, TypeScript reads a tag on these hosts as a `this` parameter of the function, and reports `TS2730` when the function is an arrow function. Converting object properties, object methods, and call arguments does not report TS2730.
 
 
 ### Code the rule cannot check
@@ -313,108 +296,47 @@ These uses also count through simple aliases, such as `const alias = fn; new ali
 > [!WARNING]
 > The rule only checks the current file. A conversion can still break your project in the cases below, so check for them before you enable the rule.
 
-- **Uses in other files.** Another file can read a converted function's `.name`, `.prototype`, `.caller`, or `.arguments`, or call it with `new`. List those functions in [`allowedNames`](#allowednames).
+- **Uses in other files.** Another file can read a converted function's `.name`, `.prototype`, `.caller`, or `.arguments`, or call it with `new`. Use a config object with `files` that turns the rule off for affected files, or a [disable comment](#keeping-functions) for each affected function.
 - **Import cycles.** In an import cycle, another module can call an exported function before its own module finishes running. A function declaration already works at that point, but a `const` arrow function does not exist yet, so the call throws. This also applies to any converted helper that the exported function calls. Bundling does not prevent it. Disable the rule for modules that other modules in a cycle call while they load.
 - **Indirect uses.** The rule follows aliases through variable initializers, `=` assignments (including chains), and default values in parameters and destructuring patterns. It follows values through parentheses, TypeScript `as`, `satisfies`, non-null and angle-bracket assertions, instantiation expressions, conditional branches, logical operands, and the last operand of a comma expression. It checks direct and aliased property reads, including object destructuring of the function's properties. For computed keys, it recognizes string literals and template literals without substitutions, including those wrapped in TypeScript expressions.
 
-  The rule does not follow other ways a function reaches another name, such as objects, arrays, call arguments, returns, compound assignments, or destructuring the function out of an object. It does not recognize other computed keys, such as `f['proto' + 'type']`. For example, `const o = { f }; new o.f()` and `const { f: alias } = o; new alias()` can break after `f` is converted. List those functions in [`allowedNames`](#allowednames).
+  The rule does not follow other ways a function reaches another name, such as objects, arrays, call arguments, returns, compound assignments, or destructuring the function out of an object. It does not recognize other computed keys, such as `f['proto' + 'type']`. For example, `const o = { f }; new o.f()` and `const { f: alias } = o; new alias()` can break after `f` is converted. Use a [disable comment](#keeping-functions), or a config object with `files` that turns the rule off for affected files.
 - **Code that reads a function's source.** Converting a function changes its source text, which `fn.toString()` returns. Code that reads a function's source breaks, for example to run it in another context, or to read its parameter names for dependency injection, as `async.autoInject()` does.
 - **Inferred return types.** The rule does not detect functions that cannot complete because of loops, exhaustive `switch` statements, labeled statements, or calls to functions returning `never`. It only treats the literal tests `true` and `false` as constant, not expressions such as `if (x || true) throw e`. Converting one can change its inferred return type from `void` to `never` (or `Promise<void>` to `Promise<never>` if async), which changes its `.d.ts` output. Add a return type annotation to keep the type.
-- **Type augmentation in other files.** Another module can add overloads, or a `namespace` that contains values, to an exported function with `declare module`. A `const` can't merge with them, so TypeScript reports `TS2451`. List those functions in [`allowedNames`](#allowednames).
-- **Older syntax targets.** The fixes output ES2015 syntax: arrow functions and `const`. With `classMethods`, they output class fields, which are ES2022. Do not enable the rule for code that must run without a build step in older environments, or that a tool parses with an older syntax version, such as an ESLint config with `ecmaVersion: 3`.
+- **Type augmentation in other files.** Another module can add overloads, or a `namespace` that contains values, to an exported function with `declare module`. A `const` can't merge with them, so TypeScript reports `TS2451`. Use a [disable comment](#keeping-functions), or a config object with `files` that turns the rule off for affected files.
+- **Older syntax targets.** The fixes output ES2015 syntax: arrow functions and `const`. Do not enable the rule for code that must run without a build step in older environments, or that a tool parses with an older syntax version, such as an ESLint config with `ecmaVersion: 3`.
+
+### Keeping functions
+
+To keep individual functions, place an `// eslint-disable-next-line arrow/prefer-arrow-functions` comment directly above the line where ESLint reports the function. The comment suppresses every report from this rule on that line.
+
+A comment keeps the function only while this rule reports it. `eslint --fix` removes disable comments that are unused at the time, unless [`linterOptions.reportUnusedDisableDirectives`](https://eslint.org/docs/latest/use/configure/configuration-files#report-unused-disable-directives) is `"off"`. With `no-function-hoisting` also enabled, a fix pass can run before this rule reports the function, for example while a declaration still has to move. That pass removes the comment, and a later pass converts the function. To keep functions reliably, use a config object with `files` that turns this rule off for those files, or set `reportUnusedDisableDirectives` to `"off"`.
 
 ## Options
 
-Each option keeps one kind of function as a `function`. Options do not interact: a combination keeps exactly the functions that each option keeps on its own. Each option below lists the reasons to enable and disable it. The defaults are shown below.
+The default is shown below.
 
 ```js
 export default [{
     rules: {
         'arrow/prefer-arrow-functions': ['error', {
-            classMethods: false,
-            objectMethods: true,
-            namedFunctionExpressions: false,
-            allowedNames: []
+            objectMethods: false
         }]
     }
 }]
 ```
 
-### `classMethods`
+### `objectMethods`
 
 Type: `boolean`
 
 Default: `false`
 
-Converts class methods to arrow function class fields.
-
-<!-- eslint-disable pvtnbr/prefer-arrow-functions -->
-```js
-// ❌ With `classMethods: true`
-class Counter {
-    count = 0
-
-    increment() {
-        this.count += 1
-    }
-}
-
-button.addEventListener('click', counter.increment)
-```
-<!-- eslint-enable pvtnbr/prefer-arrow-functions -->
-
-```js
-// ✅
-class Counter {
-    count = 0
-
-    increment = () => {
-        this.count += 1
-    }
-}
-
-button.addEventListener('click', counter.increment)
-```
-
-**Why enable it:**
-
-- An arrow function field binds `this` to the instance. The method keeps working when you pass it as a callback, such as the event handler above, so you do not need `this.increment = this.increment.bind(this)` in the constructor.
-- Classes use the same arrow function syntax as the rest of the code.
-
-**Why disable it:**
-
-A class field is not a method. It is an own property that each instance gets when the constructor runs, instead of one function on the prototype. Keep this option disabled if your code depends on any of these method behaviors:
-
-- `Class.prototype.method` and prototype mocks, such as `jest.spyOn(Class.prototype, 'method')` and `sinon.stub(Class.prototype, 'method')`, no longer find the method.
-- A method called with another `this` still uses the instance. This breaks proxies that call methods through themselves, such as [Immer](https://immerjs.github.io/immer/complex-objects) drafts of classes marked `[immerable]`: the method changes the original object instead of the draft. It also breaks `method.call(other)` and methods copied to another object.
-- Instances have one more own property, so `Object.keys()`, `for...in`, `{ ...instance }`, and deep equality include it. Two instances are no longer deeply equal, and `structuredClone()` throws a `DataCloneError`.
-- Each instance creates its own copy of the function, instead of sharing one.
-- A subclass method with the same name no longer overrides it, because the instance field hides the subclass's prototype method. TypeScript reports this as an error, but JavaScript does not.
-- A parent class constructor that calls the method runs before the subclass's fields exist, so it calls the parent's method instead.
-- TypeScript checks method parameters bivariantly, but function-typed fields contravariantly with `strictFunctionTypes`. A subclass or an object that implements a method with a narrower parameter type then fails to type-check.
-- A framework that calls lifecycle methods from the prototype does not find them. List those names in [`allowedNames`](#allowednames). The rule already keeps custom element callbacks, which browsers read from the prototype.
-
-The rule only checks the current file for these problems. Even with the option enabled, it keeps these methods, because converting them would break code in the same file:
-
-- Static methods that use `this`. A static arrow field binds `this` to the class that declares it, even when a subclass calls it.
-- Methods whose name is read through `super.name` or `Class.prototype.name` in the file.
-- Methods that an earlier field initializer or static block reads, because the field does not exist yet when that code runs.
-- Methods with the TypeScript `override` modifier, because the parent class might call them from its constructor.
-- Overloaded and decorated methods, which have no class field equivalent.
-- TypeScript methods with a `this` type in their signature, such as `optional(): Optional<this>`. A field's type comes from its value, so the `this` type can make the field's type depend on itself, which TypeScript reports as TS7022.
-- [Custom element lifecycle callbacks](https://html.spec.whatwg.org/multipage/custom-elements.html#dom-customelementregistry-define), such as `connectedCallback` and `attributeChangedCallback`. `customElements.define()` reads them from the prototype, so the browser never calls them when they are class fields.
-
-### `objectMethods`
-
-Type: `boolean`
-
-Default: `true`
-
 Converts object shorthand methods to arrow function properties.
 
 <!-- eslint-disable pvtnbr/prefer-arrow-functions -->
 ```js
-// ❌
+// ❌ With `objectMethods: true`
 const store = {
     load() {}
 }
@@ -444,102 +366,9 @@ const store = {
 
 Properties with a function value, such as `{ load: function () {} }`, are still converted when this option is disabled, because they are not shorthand methods.
 
-### `namedFunctionExpressions`
+## Migrating from 1.x
 
-Type: `boolean`
-
-Default: `false`
-
-Converts function expressions whose own name differs from the name that the arrow function would get. The fix removes the name, so this option changes behavior that code can observe.
-
-<!-- eslint-disable pvtnbr/prefer-arrow-functions, prefer-arrow-callback -->
-```js
-// ❌ With `namedFunctionExpressions: true`
-setInterval(function onTick() {}, 1000)
-```
-<!-- eslint-enable pvtnbr/prefer-arrow-functions, prefer-arrow-callback -->
-
-```js
-// ✅
-setInterval(() => {}, 1000)
-```
-
-A function expression that keeps its name is always converted. An arrow function gets its name from the variable, property, or default value it is assigned to, so the converted function below is still named `load`:
-
-<!-- eslint-disable pvtnbr/prefer-arrow-functions, func-style -->
-```js
-// ❌ With any setting
-const load = function load() {}
-```
-<!-- eslint-enable pvtnbr/prefer-arrow-functions, func-style -->
-
-```js
-// ✅
-const load = () => {}
-```
-
-**Why enable it:**
-
-- Callbacks use the same arrow function syntax as the rest of the code.
-
-**Why keep it disabled:**
-
-- A callback loses its name, so stack traces and debuggers show it as anonymous. A mocha test that checked a stack trace for `at throwError` failed when `function throwError() {}` was converted.
-- Libraries that read the name lose it too. React names `memo(function Row() {})` `Row`, but names the converted `memo(() => {})` `Memo`.
-- You use [`func-names`](https://eslint.org/docs/latest/rules/func-names) to require names on function expressions. With this option disabled, the two rules work together: `func-names` requires the names, and this rule keeps them.
-
-### `allowedNames`
-
-Type: `string[]`
-
-Default: `[]`
-
-Names of functions to never convert. A name matches the function's own name, the variable or property it is assigned to, or the method name. Private methods include the `#`. Names must match exactly; patterns are not supported.
-
-```js
-export default [{
-    rules: {
-        'arrow/prefer-arrow-functions': ['error', {
-            classMethods: true,
-            allowedNames: ['ngOnInit', 'ngOnDestroy']
-        }]
-    }
-}]
-```
-
-**Why add names:**
-
-- With `classMethods`, a framework calls lifecycle methods from the prototype. For example, Angular does not call lifecycle hooks that are class fields, and [`react/no-arrow-function-lifecycle`](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-arrow-function-lifecycle.md) converts React lifecycle fields back to methods. These names repeat in every component, so one config entry replaces a comment in every file.
-- Another file depends on functions with a certain name staying a `function`, for example by reading their `prototype` or calling them with `new`. The rule only checks the current file, so it cannot see that use.
-
-**Why keep the list short:**
-
-- Names apply to every kind of function, not only methods. Adding a common name such as `render` also keeps every other function named `render`.
-- A disable comment or a config override is often more precise. See the next section.
-
-#### `allowedNames`, disable comments, or config overrides?
-
-All three keep functions unconverted. Choose by how the exception repeats:
-
-| The exception is... | Use | Why |
-| --- | --- | --- |
-| One function | `// eslint-disable-next-line arrow/prefer-arrow-functions` | The reason stays next to the code, and ESLint reports the comment once it no longer suppresses anything ([`reportUnusedDisableDirectives`](https://eslint.org/docs/latest/use/configure/rules#report-unused-eslint-disable-comments)). |
-| The same name in many files, such as a lifecycle method | `allowedNames` | One config entry replaces a comment in every file, and the other functions in those files are still converted. |
-| Every function of a kind in some files | A config object with `files` | For example, set `classMethods: false` for `**/*.component.ts`. No list is needed. |
-
-A disable comment turns off the whole rule for its line, so it also hides other functions on that line. `allowedNames` only keeps functions with the listed names.
-
-Flat config is JavaScript, so you can build the list instead of typing it. For example, `@angular-eslint/utils` exports Angular's lifecycle names:
-
-```js
-import { ASTUtils } from '@angular-eslint/utils'
-
-export default [{
-    rules: {
-        'arrow/prefer-arrow-functions': ['error', {
-            classMethods: true,
-            allowedNames: [...ASTUtils.ANGULAR_LIFECYCLE_METHODS]
-        }]
-    }
-}]
-```
+- `classMethods` converted class methods to arrow function fields. Remove the option: class methods now stay methods. Write a field explicitly if you need a bound arrow function.
+- `namedFunctionExpressions` converted function expressions even when their names would change. Remove the option. Expressions whose names would change now stay functions; convert them manually if that change is acceptable.
+- `allowedNames` kept functions with matching names. Remove the option and use a config object with `files` that turns the rule off for affected files, or a [disable comment](#keeping-functions) for each function.
+- `objectMethods` now defaults to `false`. Set it to `true` to retain the 1.x conversion of object shorthand methods.

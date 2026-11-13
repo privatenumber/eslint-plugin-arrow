@@ -5,7 +5,7 @@ import typescriptParser from '@typescript-eslint/parser';
 import arrow from 'eslint-plugin-arrow';
 
 // A `// ❌` example must fix to the `// ✅` example after it, and a `// ✅` example on its own
-// must not be reported. Options come from the first comment, such as `With \`classMethods: true\``.
+// must not be reported. Options come from the first comment, such as `objectMethods: true`.
 // Rule docs run only their rule, and the README runs the recommended config
 const codeBlockPattern = /```(js|ts|tsx)\n([\s\S]*?)```/g;
 const optionPattern = /`(\w+): (true|false)`/g;

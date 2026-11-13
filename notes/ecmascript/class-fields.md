@@ -1,6 +1,6 @@
 # Class fields versus methods
 
-An arrow function class field (`m = () => {}`) is not a method. It is an own data property that the constructor creates on each instance, and its `this` is fixed when the field is created. Every difference below follows from that, and each one is a way that `classMethods: true` can change behavior.
+An arrow function class field (`m = () => {}`) is not a method. It is an own data property that the constructor creates on each instance, and its `this` is fixed when the field is created. Every difference below follows from that, and each one shows why the former 1.x `classMethods: true` option could change behavior.
 
 Last verified: 2026-10-31, Node.js v26.13.0, against the [ES2025 specification](https://tc39.es/ecma262/2025/).
 

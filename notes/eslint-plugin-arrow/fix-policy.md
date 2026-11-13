@@ -12,7 +12,7 @@ Status: decided 2026-11-12. Extended on 2026-11-13 by an audit of the rule's opt
 4. **Fix everything else.** This includes call arguments, exports, and values stored in objects and arrays. The tested breakage rate for these is zero (see [Measured breakage](#measured-breakage)).
 5. **Downgrade a tier only with evidence of risk, not because a risk is possible.** Every category outside the file has a possible risk. Downgrading all of them would remove most of the rule's fixes (see [Rejected: suggest for every value that leaves the file](#rejected-suggest-for-every-value-that-leaves-the-file)).
 6. **Default off an option whose syntax alone changes TypeScript checking.** `objectMethods` changes to default `false` (see [Object methods](#object-methods)).
-7. **No option opts into a fix that silently changes runtime behavior.** An option may widen what the rule converts only when its fixes fit the same model as the default fixes. `objectMethods` fits: its runtime change, `toString()` output, applies to every fix, and its TypeScript change surfaces as a type error in the user's own type check. `classMethods` and `namedFunctionExpressions` did not fit, and 2.0 removes them, together with `allowedNames` (see [Removed options](#removed-options)).
+7. **No option opts into a fix that silently changes runtime behavior.** An option may widen what the rule converts only when its fixes fit the same model as the default fixes. `objectMethods` fits: its runtime change, `toString()` output, applies to every fix. Its TypeScript change is documented with the option and often surfaces as a type error, though it can also change a type without an error, as in a conditional type that compares method signatures. `classMethods` and `namedFunctionExpressions` did not fit, and 2.0 removes them, together with `allowedNames` (see [Removed options](#removed-options)).
 8. **Types do not change the tier in 2.0.** A typed mode could add skips and suggestions but never fixes, and it waits on a measurement (see [Type information](#type-information)).
 
 ## Evidence
@@ -122,7 +122,7 @@ Method: the corpus scan above ran once for each opt-in option, on the 16 reposit
 
 #### `classMethods`
 
-The option converted class methods to arrow class fields. A class field is an own, enumerable property of each instance, created when the constructor runs, so the conversion changes behavior by design: `this` binding for `.call` and detached calls, prototype lookup and spies, overrides, and own-property enumeration and equality. The option also widened the rule a lot: three.js went from 5,453 to 11,274 reports, and Angular Components from 814 to 5,655.
+The option converted class methods to arrow class fields. A public instance field is an own, enumerable property of each instance, created when the constructor runs. Static and private methods became static and private fields, which have other differences. So the conversion changes behavior by design: `this` binding for `.call` and detached calls, prototype lookup and spies, overrides, and own-property enumeration and equality. The option also widened the rule a lot: three.js went from 5,453 to 11,274 reports, and Angular Components from 814 to 5,655.
 
 | Repository | Result |
 | --- | --- |
@@ -139,13 +139,13 @@ The option converted a function expression whose own name differs from the name 
 
 #### `allowedNames`
 
-The option listed exact names that the rule never converts. The rule docs recommended it as the remedy for conversions the rule cannot check. The audit found three problems:
+The option listed exact names that the rule never converts. The rule docs recommended it for lifecycle methods with `classMethods`, and for functions that other files construct or inspect. The audit found three problems:
 
-- **It applies after the damage.** A user learns which name to list only after a fix has broken code.
-- **It is global.** A name matches every function with that name in every file. In Async, listing the two `autoInject` methods that broke (`a` and `task5`) also kept 7 unrelated functions.
+- **The user must find the names.** The rule cannot tell which names need the option, so a user finds them by searching other files before enabling the rule, or after a fix has broken code.
+- **It is broad.** A name matches every function with that name in the files the config object selects, which is every file unless the user scopes the option with `files`. In Async, listing the two `autoInject` methods that broke (`a` and `task5`) also kept 7 unrelated functions.
 - **It does not fix whole classes of breakage.** With `classMethods`, listing `removeLink` only moved the Async parse error to the next method, `empty`.
 
-Stale entries are never reported, so the list only grows. Its one defended use, lifecycle methods with `classMethods`, goes away with that option. The docs now point to tools that are local and reported when stale: an `eslint-disable-next-line` comment for one function, and a config object with `files` that turns the rule off for some files.
+Stale entries are never reported, so the list only grows. The lifecycle use goes away with `classMethods`. The cross-file use remains, and removing the option loses one capability: a single entry that keeps every function with a name, such as a lowercase `factory` that consumers construct, across many modules. The docs now point to an `eslint-disable-next-line` comment for each function, which is local and which ESLint reports when stale with `reportUnusedDisableDirectives`, and to a config object with `files` that turns the rule off for some files. ESLint does not report a stale `files` override. A codebase with many such functions needs more comments than one list entry, which also makes each exception visible where it applies.
 
 GitHub code search found no external config that uses any of the three options. Indexed files are not a full count of users, but `eslint-plugin-arrow@1.0.0` was published on 2026-11-04, so few configs can depend on them.
 
@@ -160,7 +160,7 @@ The audit also checked the fixes that stay:
 | Object method to arrow property | `toString()` output, TypeScript parameter checking | Keep, behind `objectMethods`, default `false` |
 | Function passed to `Reflect.construct` | The arrow cannot be constructed. The rule follows `new` but not this built-in. | Bug: keep the function. |
 
-In `no-function-hoisting`, the move fix changed behavior for a declaration in a block or `switch` case in sloppy-mode code. [Annex B.3.3](https://tc39.es/ecma262/#sec-block-level-function-declarations-web-legacy-compatibility-semantics) assigns the function to the outer `var` binding only when the declaration statement runs, so moving the statement earlier changes what code outside the block sees. In a CommonJS reproduction, `typeof f` read through an outer function logged `undefined undefined` before the fix and `undefined function` after it. That rule now reports these declarations without a fix. `prefer-arrow-functions` already skipped them for a related reason.
+In `no-function-hoisting`, the move fix changed behavior for a declaration in a block or `switch` case in sloppy-mode code. [Annex B.3.3](https://tc39.es/ecma262/#sec-block-level-function-declarations-web-legacy-compatibility-semantics) assigns the function to the outer `var` binding only when the declaration statement runs, so moving the statement earlier changes what code outside the block sees. In a CommonJS reproduction, `typeof f` read through an outer function logged `undefined undefined` before the fix and `undefined function` after it. That rule will report these declarations without a fix (see [Implementation](#implementation)). `prefer-arrow-functions` already skipped them for a related reason.
 
 ### Type information
 
@@ -173,7 +173,7 @@ In `no-function-hoisting`, the move fix changed behavior for a declaration in a 
 
 A second exploration on 2026-11-13 (TypeScript 6.0.3, `@typescript-eslint/parser` 8.72.2, ESLint 10.14.0) tested each limitation in the rule docs with small fixture projects and the compiler API. Types help with three checks:
 
-- **Skip:** an annotated return type that resolves to `never`, including an alias imported from another file. The syntax-only check sees only the literal `never` keyword.
+- **Skip:** an annotated return type that resolves to `never`, including an alias imported from another file. The syntax-only check follows type aliases declared in the same file only.
 - **Skip:** a function declaration merged with a declaration in another file, such as a `declare module` augmentation. After the conversion, both files fail with `TS2451`. The checker's symbol lists every merged declaration.
 - **Suggestion:** a callback passed to a parameter whose declared type, after resolving constraints, has a construct signature. This catches `W.mockImplementation(function () {})`, the gap in [Constructor names](#constructor-names). The declared type allows construction but does not prove it, so this is a suggestion, not a skip.
 
@@ -219,7 +219,7 @@ The probe and the fix-then-test harness were scratch scripts and were not kept, 
 | vitest-dev/vitest | `f4fdbcae08ec` | 1,980 |
 | webpack/webpack | `00c67af54e09` | 5,626 |
 
-The fix-then-test runs installed dependencies with `npm ci --ignore-scripts` (`npm install --ignore-scripts` for Express, which has no lockfile), then ran `npm test` (Express), `npm run mocha-node-test` (Async), `npm run test:main` after the documented build (Lodash), and `npm run test:vitest:unit` (Axios).
+The option audit used the same probe with each option enabled, and the same fix-then-test harness and commands. The fix-then-test runs installed dependencies with `npm ci --ignore-scripts` (`npm install --ignore-scripts` for Express, which has no lockfile), then ran `npm test` (Express), `npm run mocha-node-test` (Async), `npm run test:main` after the documented build (Lodash), and `npm run test:vitest:unit` (Axios).
 
 ## Rejected alternatives
 

@@ -34,7 +34,7 @@ The rule reported 33,602 functions. The primary label of each, with the first ma
 
 The probe labeled 52 more reports (0.2%) as other uses or property values. Source files are 16,668 reports and test files are 16,934. Test files match `test/`, `tests/`, `__tests__/`, `spec/`, `e2e/`, or `.test.` and `.spec.` names. The parser failed on 1,153 files, most of them deliberately invalid test inputs in Prettier and webpack.
 
-Callees of call arguments: test framework functions (`it`, `describe`, `test`) 40.5%, names of built-in callback APIs (`then`, `forEach`, `map`, `setTimeout`, `addEventListener`) 19.7%, other 39.6%. Callees whose last name is a mock API, such as `vi.fn` and `mockImplementation`, received 13 functions in the whole corpus. None were `jest.mock` or `vi.mock` factories.
+Callees of call arguments: test framework functions (`it`, `describe`, `test`) 40.5%, names of built-in callback APIs (`then`, `forEach`, `map`, `setTimeout`, `addEventListener`) 19.7%, mock APIs 0.1%, other 39.6%. The mock group is callees whose last name is a mock API, such as `vi.fn` and `mockImplementation`, and it received 13 functions in the whole corpus. None were `jest.mock` or `vi.mock` factories.
 
 #### Correction: TypeScript and JSX files
 
@@ -160,7 +160,7 @@ The audit also checked the fixes that stay:
 | Object method to arrow property | `toString()` output, TypeScript parameter checking | Keep, behind `objectMethods`, default `false` |
 | Function passed to `Reflect.construct` | The arrow cannot be constructed. The rule follows `new` but not this built-in. | Bug: keep the function. |
 
-In `no-function-hoisting`, the move fix changed behavior for a declaration in a block or `switch` case in sloppy-mode code. [Annex B.3.3](https://tc39.es/ecma262/#sec-block-level-function-declarations-web-legacy-compatibility-semantics) assigns the function to the outer `var` binding only when the declaration statement runs, so moving the statement earlier changes what code outside the block sees. In a CommonJS reproduction, `typeof f` read through an outer function logged `undefined undefined` before the fix and `undefined function` after it. That rule will report these declarations without a fix (see [Implementation](#implementation)). `prefer-arrow-functions` already skipped them for a related reason.
+In `no-function-hoisting`, the move fix changed behavior for a declaration in a block or `switch` case in code that is not strict. [Annex B.3.3](https://tc39.es/ecma262/#sec-block-level-function-declarations-web-legacy-compatibility-semantics) assigns the function to the outer `var` binding only when the declaration statement runs, so moving the statement earlier changes what code outside the block sees. In a CommonJS reproduction, `typeof f` read through an outer function logged `undefined undefined` before the fix and `undefined function` after it. Whether code is strict after compilation depends on settings the linter cannot see, such as TypeScript's `alwaysStrict` and `moduleDetection`, and on downleveled namespaces and class static blocks. So that rule will report every declaration in a block or `switch` case without a fix, strict or not (see [Implementation](#implementation)). In the corpus, 9 of its 4,253 fixable reports (0.2%) are in a block or `switch` case. `prefer-arrow-functions` already skipped them for a related reason.
 
 ### Type information
 
@@ -248,7 +248,8 @@ Skipping would avoid a report that a user must resolve. Rejected because the sea
 - **Suggestion instead of fix for constructor-named functions:** the rule reports the same functions, but `eslint --fix` no longer clears those reports. A lint build that ran `--fix` and passed can then fail, as when a bug fix reports more errors. ESLint's policy releases that case as a minor version, so this change is a `feat:`, a minor release. The old fix makes `new` throw `TypeError`, so keeping it is not an option.
 - **`objectMethods` default `false`:** the rule reports fewer functions by default. A build can still fail when it reports unused disable directives as errors (`reportUnusedDisableDirectives: 'error'`), because a disable comment above an object method no longer suppresses anything. ESLint's policy accepts this effect for changes that report fewer errors, which it releases as patches. This change alters a default rather than fixing a bug, so it is a `feat:`. It ships in the same PR as the removed options. Users who want the old behavior set `objectMethods: true`.
 - **Removed options:** a config that passes `classMethods`, `namedFunctionExpressions`, or `allowedNames` fails schema validation, which breaks the lint build. This is a major release. The commit uses a `BREAKING CHANGE:` footer, because semantic-release's default Angular preset, which this repository uses, ignores `feat!:`.
-- **`Reflect.construct` and the `no-function-hoisting` sloppy-block fix:** bug fixes, released as patches.
+- **`Reflect.construct`:** the rule reports fewer functions, a bug fix released as a patch.
+- **`no-function-hoisting` block declarations:** the rule reports the same declarations, but `eslint --fix` no longer clears those in blocks and `switch` cases. Like the constructor-name suggestion, this is a minor change under ESLint's policy. It ships in 2.0 with the other changes, so its `fix:` commit type does not change the release version.
 - **The docs corrections:** documentation only, with no release of their own.
 
 Releases publish only from `master` and `beta` (`.github/workflows/release.yml`). Changes merged to `develop` collect there, so all of these ship together as 2.0.0 when `develop` is merged into `master`.
@@ -260,7 +261,7 @@ Each change has its own PR:
 1. Remove `classMethods`, `namedFunctionExpressions`, and `allowedNames`, and the code that only they used. Change the `objectMethods` default to `false`. Update the rule docs with a section on migrating from 1.x, the README, CONTRIBUTING, and the options note.
 2. Keep a function passed to `Reflect.construct` in the same file, directly or through an alias. The rule follows `new` but not this built-in, so the file shows the need and the current fix breaks it.
 3. Add `meta.hasSuggestions` and the suggestion tier for functions with a constructor name that are used other than by direct calls, with tests for each signal and for the JSX exception. This resolves #10.
-4. In `no-function-hoisting`, report a declaration in a sloppy-mode block or `switch` case without a fix.
+4. In `no-function-hoisting`, report a declaration in a block or `switch` case without a fix.
 
 Follow-up after 2.0: the typed-mode measurement in [Type information](#type-information).
 

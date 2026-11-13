@@ -310,7 +310,7 @@ These uses also count through simple aliases, such as `const alias = fn; new ali
 
 To keep individual functions, place an `// eslint-disable-next-line arrow/prefer-arrow-functions` comment directly above the line where ESLint reports the function. The comment suppresses every report from this rule on that line.
 
-ESLint can remove a comment that is unused during a fix pass. If `no-function-hoisting` still needs to move a declaration, the comment can be removed before `prefer-arrow-functions` reports it. Move the declaration above its uses before adding the comment.
+A comment keeps the function only while this rule reports it. `eslint --fix` removes disable comments that are unused at the time, unless [`linterOptions.reportUnusedDisableDirectives`](https://eslint.org/docs/latest/use/configure/configuration-files#report-unused-disable-directives) is `"off"`. With `no-function-hoisting` also enabled, a fix pass can run before this rule reports the function, for example while a declaration still has to move. That pass removes the comment, and a later pass converts the function. To keep functions reliably, use a config object with `files` that turns this rule off for those files, or set `reportUnusedDisableDirectives` to `"off"`.
 
 ## Options
 

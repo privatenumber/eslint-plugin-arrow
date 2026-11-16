@@ -112,13 +112,15 @@ describe('oxlint', () => {
 				extends: ['./node_modules/eslint-plugin-arrow/oxlint.json'],
 				rules: {
 					'arrow/no-function-hoisting': ['error', { allowInFunctionBodies: true }],
-					'arrow/prefer-arrow-functions': ['error', { allowedNames: ['load'] }],
+					'arrow/prefer-arrow-functions': ['error', { objectMethods: true }],
 				},
 			}),
-			'file.ts': source,
+			'file.ts': 'export const object = { load() {} };\nexport const outer = () => helper();\nfunction helper() { return arguments; }',
 		});
 
-		expect(await lint(fixture.path)).toStrictEqual([]);
+		expect(await lint(fixture.path)).toStrictEqual([
+			'arrow(prefer-arrow-functions): Prefer arrow function',
+		]);
 	});
 
 	// Oxlint's parser exposes the hashbang differently from ESLint's

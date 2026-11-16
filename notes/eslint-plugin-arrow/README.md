@@ -2,7 +2,7 @@
 
 Project decisions, test methods, and positioning.
 
-- [prefer-arrow-functions-options.md](./prefer-arrow-functions-options.md): why each option exists, its name and default, how options combine, and the experiments behind each decision.
+- [prefer-arrow-functions-options.md](./prefer-arrow-functions-options.md): historical 1.x option decisions and experiments, with 2.0 removals noted.
 - [no-function-hoisting.md](./no-function-hoisting.md): the audit of `no-function-hoisting`, its options, and the plugin API, with experiments and test coverage.
 - [runtime-safety.md](./runtime-safety.md): how the before-and-after runtime suite tests the fixes, the behavior changes it and the field test found, and why each became a skip, including the checked function properties and constructor use through aliases.
 - [type-safety.md](./type-safety.md): the five function shapes whose conversion breaks type checking or changes inferred types, the syntactic skip for each, and why the rule has no type-aware mode.

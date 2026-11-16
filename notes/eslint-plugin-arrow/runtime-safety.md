@@ -11,7 +11,7 @@ Last verified: 2026-10-31, before the first release, with Node.js v26.13.0, ESLi
 1. The two logs are strictly equal.
 2. Whether the fix changed the code matches the fixture's expectation. Without this, a fixture that stops converting would still pass and silently stop covering the fix.
 
-Every fixture runs under three configs: the recommended config, a config with every conversion option enabled except `namedFunctionExpressions`, and `prefer-arrow-functions` alone. The third exists because `no-function-hoisting` can hide an unsafe conversion: it moves a calling function above its first use, which turns a later reference into an earlier one that the rule already skips. The field test found a bug that only `prefer-arrow-functions` alone exposed, and the first two configs passed with it. Fixtures declare their source type, which sets both the parser's `sourceType` and how the code runs:
+Every fixture runs under three configs: the recommended config, a config with `objectMethods: true`, and `prefer-arrow-functions` alone. The third exists because `no-function-hoisting` can hide an unsafe conversion: it moves a calling function above its first use, which turns a later reference into an earlier one that the rule already skips. The field test found a bug that only `prefer-arrow-functions` alone exposed, and the first two configs passed with it. Fixtures declare their source type, which sets both the parser's `sourceType` and how the code runs:
 
 | Source type | How it runs |
 | --- | --- |
@@ -121,7 +121,7 @@ Issues [#2](https://github.com/privatenumber/eslint-plugin-arrow/issues/2) and [
 - Add `caller` and `arguments`. A sloppy `function` returns `null` or a value, and every other form throws `TypeError`. The rule skips them in strict code too: a read of `f.caller` is rare, so the skip costs almost nothing, and the rule does not need a second strictness check.
 - Remove `length`. The built-in value was `2` for every form of `f(a, b) {}`, so reading it does not change behavior. Code can redefine `length` with a getter that inspects the function, but that is not worth a skip for every `length` read. This is the only change in the list that converts more code.
 - Removing `length` also removes accidental protection. In 1.0.0, a `length` read kept functions that other checks miss: the type cases in [type-safety.md](./type-safety.md), a direct `eval` ([#11](https://github.com/privatenumber/eslint-plugin-arrow/issues/11)), and construction through `Reflect.construct` ([#10](https://github.com/privatenumber/eslint-plugin-arrow/issues/10)). The `length` removal therefore depends on the skips for #3, #4, #5, #6, #9, and #11. #10 stays a documented limit.
-- Keep `name`. Every form keeps the name by default, but `namedFunctionExpressions: true` is documented to change it, and the check protects that opt-in.
+- Keep `name`. The rule keeps named function expressions when conversion would change their inferred name.
 
 ## Constructor use through an alias
 
@@ -154,7 +154,7 @@ Other computed keys are not recognized, even when they are constant, such as `f[
 
 Each converts in 1.0.0, verified for `caller`, `prototype`, `name`, and `new`.
 
-Keeping a function whose `caller` is read does not keep its callers. In `function f() { return f.caller.arguments[0] }`, the read reaches the calling function's `arguments`, which throws if that caller was converted. The rule cannot know which functions call `f`, so the rule docs name this limit and point to `allowedNames`.
+Keeping a function whose `caller` is read does not keep its callers. In `function f() { return f.caller.arguments[0] }`, the read reaches the calling function's `arguments`, which throws if that caller was converted. The rule cannot know which functions call `f`, so the rule docs name this limit and point to a line-level disable comment or file-scoped config.
 
 Every other way a function reaches another name is not followed: objects and arrays (`{ A }`, `[A]`), destructuring the function out of an object, function arguments (`vi.fn(A)`, `Reflect.construct(A, [])`), and returns. Each would need to follow values through data structures or calls, which needs data flow analysis. The call argument case has its own issue, [#10](https://github.com/privatenumber/eslint-plugin-arrow/issues/10), because Biome #9585 shows it in real test code.
 
@@ -172,12 +172,12 @@ Issue [#11](https://github.com/privatenumber/eslint-plugin-arrow/issues/11). The
 
 Parameter defaults run in the function's scope, so `function f(a = eval('arguments[1]'))` reads `f`'s own `arguments`. `(0, eval)(code)` and `globalThis.eval(code)` do not count, because no emit makes them direct. A call inside a nested function also counts. That is exact for a nested arrow function and conservative for a nested `function`, which the rule accepts because direct `eval` is rare.
 
-The skip protects only the function that contains the call. Evaluated code can also call another function in scope, or read a `super` member, and the rule still converts that function: in `function a() { const x = eval('b()'); function b() {} return x }`, the converted `const b` is not initialized when `eval` runs. With `classMethods`, keeping an overriding method that calls `eval` while converting the method it overrides lets the field shadow it. That is the documented override limit of `classMethods`, which every other reason for keeping a method shares, so the rule does not match methods across classes for `eval` alone.
+The skip protects only the function that contains the call. Evaluated code can also call another function in scope, or read a `super` member, and the rule still converts that function: in `function a() { const x = eval('b()'); function b() {} return x }`, the converted `const b` is not initialized when `eval` runs.
 
 ## Checked and unchanged
 
 These cases kept their behavior before any change, and are fixtures now: `arguments` in a nested arrow function, `this` in a default parameter, semicolon insertion before a regular expression or template literal, labeled functions, `.length`, generators, recursion through a named function expression, `new.target`, `super`, and `no-function-hoisting` moves in switch cases, nested blocks, default parameters, and static blocks.
 
-## Options excluded from the suite
+## Named function expression names
 
-`namedFunctionExpressions: true` is documented to change `.name`, so the suite's all-options config does not enable it. Its default, `false`, only converts named function expressions that keep their name; the fixture `named function expression names` logs those names. See [prefer-arrow-functions-options.md](./prefer-arrow-functions-options.md#namedfunctionexpressions).
+The rule converts named function expressions only when the inferred name remains unchanged; the fixture `named function expression names` logs those names. See [historical option research](./prefer-arrow-functions-options.md#namedfunctionexpressions).

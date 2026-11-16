@@ -128,7 +128,7 @@ Declaration output from `ts.transpileDeclaration`, for each body:
 
 An `async` function changes the same way, from `Promise<void>` to `Promise<never>`, observed with `tsc --declaration` on `export async function f() { throw new Error() }` and its arrow function form. The same change happens in JavaScript: `tsc --allowJs --declaration` emitted `export function fail(): void;` for the declaration and `export function fail(): never;` for the arrow function.
 
-So converting a function declaration, or a class method with `classMethods`, changes the inferred return type. Converting a function expression or an object method does not.
+So converting a function declaration, or a class method, changes the inferred return type. Converting a function expression or an object method does not.
 
 ### The change reaches consumers through `.d.ts` files
 

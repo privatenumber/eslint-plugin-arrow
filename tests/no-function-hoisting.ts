@@ -70,6 +70,26 @@ describe('no-function-hoisting', () => {
 
 		invalid: [
 			{
+				name: 'sloppy namespace block is reported without a fix',
+				code: "var a = 'outer'; namespace N { const peek = () => typeof a; { peek(); a(); peek(); function a() {} } }",
+				languageOptions: { parserOptions: { sourceType: 'script' } },
+				errors: [error('a')],
+				output: null,
+			},
+			{
+				name: 'sloppy enum initializer is reported without a fix',
+				code: 'enum E { X = (() => { { a(); function a() {} } return 1 })() }',
+				languageOptions: { parserOptions: { sourceType: 'script' } },
+				errors: [error('a')],
+				output: null,
+			},
+			{
+				name: 'module namespace block is reported without a fix',
+				code: 'namespace N { { a(); function a() {} } }',
+				errors: [error('a')],
+				output: null,
+			},
+			{
 				name: 'same line',
 				code: 'a();function a(){}',
 				errors: [error('a')],
@@ -253,10 +273,10 @@ describe('no-function-hoisting', () => {
 					output: 'function a(){}\n\na();\n\nb();\n',
 				},
 				{
-					name: 'keeps the blank line after the moved function in a block',
-					code: '{\n\ta();\n\n\tfunction a(){}\n\n\tb();\n}\n',
+					name: 'keeps the blank line after the moved function in a function body',
+					code: 'function b(){\n\ta();\n\n\tfunction a(){}\n\n\tb();\n}\n',
 					errors: [error('a')],
-					output: '{\n\tfunction a(){}\n\n\ta();\n\n\tb();\n}\n',
+					output: 'function b(){\n\tfunction a(){}\n\n\ta();\n\n\tb();\n}\n',
 				},
 				// Found in tj/commander.js and expressjs/express
 				{
@@ -266,10 +286,10 @@ describe('no-function-hoisting', () => {
 					output: 'function a(){}\na();\n',
 				},
 				{
-					name: 'no blank line left at the end of a block',
-					code: '{\n\ta();\n\n\tfunction a(){}\n}\n',
+					name: 'no blank line left at the end of a function body',
+					code: 'function b(){\n\ta();\n\n\tfunction a(){}\n}\n',
 					errors: [error('a')],
-					output: '{\n\tfunction a(){}\n\ta();\n}\n',
+					output: 'function b(){\n\tfunction a(){}\n\ta();\n}\n',
 				},
 				{
 					name: 'separated from the JSDoc of the target',
@@ -503,6 +523,52 @@ describe('no-function-hoisting', () => {
 				},
 			],
 			invalid: [
+				{
+					name: 'sloppy block is reported without a fix',
+					code: 'var peek = () => typeof a; { peek(); a(); function a(){} }',
+					languageOptions: { sourceType: 'commonjs' },
+					errors: [error('a')],
+					output: null,
+				},
+				{
+					name: 'sloppy switch case is reported without a fix',
+					code: 'var peek = () => typeof a; switch (1) { case 1: peek(); a(); function a(){} }',
+					languageOptions: { sourceType: 'script' },
+					errors: [error('a')],
+					output: null,
+				},
+				{
+					name: 'module block is reported without a fix',
+					code: '{ a(); function a(){} }',
+					errors: [error('a')],
+					output: null,
+				},
+				{
+					name: 'strict script block is reported without a fix',
+					code: '"use strict"; { a(); function a(){} }',
+					languageOptions: { sourceType: 'script' },
+					errors: [error('a')],
+					output: null,
+				},
+				{
+					name: 'nested block in a class static block is reported without a fix',
+					code: 'class B { static { { a(); function a(){} } } }',
+					errors: [error('a')],
+					output: null,
+				},
+				{
+					name: 'direct class static block declaration is fixed',
+					code: 'class B { static { a(); function a(){} } }',
+					errors: [error('a')],
+					output: 'class B { static { function a(){}a();  } }',
+				},
+				{
+					name: 'sloppy function body is fixed',
+					code: 'function b(){ a(); function a(){} }',
+					languageOptions: { sourceType: 'script' },
+					errors: [error('a')],
+					output: 'function b(){ function a(){}a();  }',
+				},
 				{
 					code: 'a();\nfunction a(){}\n',
 					errors: [error('a')],
